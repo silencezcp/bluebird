@@ -54,7 +54,7 @@ def main():
 
     workdir = tempfile.mkdtemp(prefix="smart-shot-")
     settings_path = os.path.join(workdir, "settings.json")
-    os.environ["SMART_FTP_SETTINGS"] = settings_path
+    os.environ["BLUEBIRD_SETTINGS"] = settings_path
 
     app = build_application([])
 
@@ -192,7 +192,7 @@ def main():
     app.setStyleSheet(theme.stylesheet())
     pump(app, 0.6)
     shot(window, os.path.join(outdir, "03-linen-dark.png"))
-    theme.apply_preset("Smart (cream)")
+    theme.apply_preset("BlueBird (cream)")
     app.setStyleSheet(theme.stylesheet())
     pump(app, 0.3)
 
@@ -203,7 +203,7 @@ def main():
     app.setStyleSheet(theme.stylesheet())
     pump(app, 0.5)
     shot(window, os.path.join(outdir, "04-custom-colours.png"))
-    theme.apply_preset("Smart (cream)")
+    theme.apply_preset("BlueBird (cream)")
     app.setStyleSheet(theme.stylesheet())
     pump(app, 0.3)
 

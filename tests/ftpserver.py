@@ -55,7 +55,7 @@ class TestFTPServer(object):
         # would let a second server clobber a running one.
         handler = type("Handler_%d" % id(self), (base,), {
             "authorizer": authorizer,
-            "banner": "Smart test server ready.",
+            "banner": "BlueBird test server ready.",
             "passive_ports": range(self.passive_base,
                                    self.passive_base + 40),
         })

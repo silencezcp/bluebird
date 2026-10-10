@@ -12,15 +12,15 @@ from ftpclient import cli  # noqa: E402
 from ftpclient import session as _session  # noqa: E402
 
 TARGET = "sftp://silence@192.168.31.142:22"
-SCRATCH = "/tmp/smartftp-cli-check"
-LOCAL = os.path.join(os.environ.get("TEMP", "/tmp"), "smartftp-cli-check")
+SCRATCH = "/tmp/bluebird-cli-check"
+LOCAL = os.path.join(os.environ.get("TEMP", "/tmp"), "bluebird-cli-check")
 
 
 def clean_previous_run() -> None:
     """Start from a clean slate so the check can be run repeatedly."""
     import shutil
 
-    password = os.environ.get("SMART_FTP_PASSWORD")
+    password = os.environ.get("BLUEBIRD_PASSWORD")
     client = _session.create_session({
         "protocol": "sftp", "host": "192.168.31.142", "port": 22,
         "user": "silence", "password": password, "timeout": 15})
@@ -62,7 +62,7 @@ def run(label, argv, expect=0):
     return body
 
 
-os.environ["SMART_FTP_PASSWORD"] = "123456"
+os.environ["BLUEBIRD_PASSWORD"] = "123456"
 
 print("=" * 70)
 print("CLI against %s" % TARGET)
@@ -94,7 +94,7 @@ if not os.path.isdir(LOCAL):
     os.makedirs(LOCAL)
 sample = os.path.join(LOCAL, "hello.txt")
 with io.open(sample, "w", encoding="utf-8") as handle:
-    handle.write("hello from the smartftp cli\n")
+    handle.write("hello from the bluebird cli\n")
 
 run("put", ["put", TARGET, sample, "-r", SCRATCH])
 run("ls after put", ["ls", "-l", TARGET, SCRATCH])
@@ -105,7 +105,7 @@ downloaded = os.path.join(LOCAL, "back.txt")
 if os.path.isfile(downloaded):
     content = io.open(downloaded, encoding="utf-8").read().strip()
     print("round trip content: %r" % content)
-    print("MATCHES: %s" % (content == "hello from the smartftp cli"))
+    print("MATCHES: %s" % (content == "hello from the bluebird cli"))
 print()
 
 run("rename", ["rename", TARGET, "-r", SCRATCH + "/hello.txt",

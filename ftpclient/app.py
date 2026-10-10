@@ -112,14 +112,14 @@ def startup_log_path() -> str:
     """Where ``--log`` writes: beside the exe, never inside the bundle."""
     from .resources import is_frozen, resource_root
     base = os.path.dirname(sys.executable) if is_frozen() else resource_root()
-    return os.path.join(base, "smartftp-startup.log")
+    return os.path.join(base, "bluebird-startup.log")
 
 
 def run_selftest() -> int:
     """Build the application, load the manual, then exit.
 
     Packaged builds have no console, so this is how a frozen executable is
-    verified: ``SmartFTP.exe --selftest --log``.
+    verified: ``BlueBird.exe --selftest --log``.
     """
     from .resources import is_frozen, resource_root
     from . import __appname__, __version__
@@ -302,7 +302,7 @@ def run(argv: Optional[List[str]] = None) -> int:
 
     i18n.changed.connect(on_language_changed)
 
-    # allow ``SmartFTP.exe sftp://user@host:22`` style arguments
+    # allow ``BlueBird.exe sftp://user@host:22`` style arguments
     args = connection_arguments(argv)
     if args:
         _connect_from_argument(window, args[0])

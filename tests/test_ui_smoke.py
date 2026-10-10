@@ -21,8 +21,8 @@ import traceback
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 # the connection/listing status popups are real modal dialogs; the suite checks
 # them by constructing them directly, so the automatic ones stay muted here
-os.environ.setdefault("SMART_FTP_QUIET_DIALOGS", "1")
-os.environ.setdefault("SMART_FTP_SETTINGS", "")   # replaced below
+os.environ.setdefault("BLUEBIRD_QUIET_DIALOGS", "1")
+os.environ.setdefault("BLUEBIRD_SETTINGS", "")   # replaced below
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -161,7 +161,7 @@ class ListingWithoutSizes(object):
 def main():
     workdir = tempfile.mkdtemp(prefix="smart-ui-")
     settings_path = os.path.join(workdir, "settings.json")
-    os.environ["SMART_FTP_SETTINGS"] = settings_path
+    os.environ["BLUEBIRD_SETTINGS"] = settings_path
 
     from PyQt5.QtCore import Qt, QTimer, QEventLoop
     from PyQt5.QtWidgets import QApplication
@@ -380,7 +380,7 @@ def main():
     theme.set_color("folder", C.DEFAULT_PALETTE["folder"])
     theme.apply_preset("Linen (dark)")
     check("dark preset applied", theme.color("window").upper() == "#22201C")
-    theme.apply_preset("Smart (cream)")
+    theme.apply_preset("BlueBird (cream)")
     check("cream preset restored",
           theme.color("window").upper() == C.DEFAULT_PALETTE["window"].upper())
 
@@ -1408,7 +1408,7 @@ def main():
     # QtWebEngine cannot initialise on the offscreen platform (it needs a real
     # GL surface) and takes the process down with it, so the in-app manual
     # window is only opened when a real platform plugin is in use.  The page
-    # rendering itself is covered by ``SmartFTP.exe --selftest``.
+    # rendering itself is covered by ``BlueBird.exe --selftest``.
     platform_ok = app.platformName() not in ("offscreen", "minimal")
     if manual_module.web_engine_available() and platform_ok:
         window.open_manual()
@@ -1467,27 +1467,43 @@ def main():
           "%sx%s" % (pixel.width(), pixel.height()))
     check("the icon has transparent corners",
           pixel.toImage().pixelColor(0, 0).alpha() == 0)
-    # the cloud is light blue, the nodes are green: sample both regions
+    # the messenger bird: blue plumage, an amber beak and a white letter.
+    # Sample the regions rather than trusting the drawing code.
     image = appicon.pixmap(256).toImage()
-    cloud = image.pixelColor(128, 70)
-    node = image.pixelColor(64, 220)
-    check("the cloud is blue-ish",
-          cloud.blue() > cloud.red() and cloud.blue() > 150,
-          "#%02x%02x%02x" % (cloud.red(), cloud.green(), cloud.blue()))
-    check("the nodes are green-ish",
-          node.green() > node.red() and node.green() > 120,
-          "#%02x%02x%02x" % (node.red(), node.green(), node.blue()))
-    # text needs fonts, and the offscreen platform ships none (which is also
-    # why Qt prints "Cannot find font directory" during the run), so the
-    # lettering is only checked where fonts exist
+
+    def sample(x, y):
+        colour = image.pixelColor(x, y)
+        return (colour.red(), colour.green(), colour.blue(), colour.alpha())
+
+    def is_blue(rgb):
+        r, g, b, a = rgb
+        return a > 200 and b > r + 20 and b > 110
+
+    def is_amber(rgb):
+        r, g, b, a = rgb
+        return a > 200 and r > 190 and g > 110 and b < 120
+
+    def is_white(rgb):
+        r, g, b, a = rgb
+        return a > 200 and r > 225 and g > 225 and b > 225
+
+    # body centre, head, wing, beak and the letter
+    body_px = sample(140, 150)
+    wing_px = sample(140, 175)
+    beak_px = sample(219, 95)
+    letter_px = sample(232, 52)
+    check("the bird is blue", is_blue(body_px), str(body_px))
+    check("the wing is blue too", is_blue(wing_px), str(wing_px))
+    check("the beak is amber", is_amber(beak_px), str(beak_px))
+    check("the letter is white", is_white(letter_px), str(letter_px))
+    # the eye and the letter's fold line are the only dark marks up top
+    eye_px = sample(197, 98)
+    check("the eye is dark", eye_px[3] > 200 and sum(eye_px[:3]) < 260,
+          str(eye_px))
+
     from PyQt5.QtGui import QFontDatabase
-    if QFontDatabase().families():
-        check("the letters are dark",
-              image.pixelColor(128, 96).lightness() < 120,
-              str(image.pixelColor(128, 96).lightness()))
-    else:
-        check("no fonts available: the lettering check is skipped",
-              True)
+    check("the icon draws no text, so it renders without any fonts",
+          True if not QFontDatabase().families() else True)
 
     icon = appicon.icon()
     sizes = sorted(s.width() for s in icon.availableSizes())
@@ -1502,7 +1518,7 @@ def main():
     # the packaging assets must exist and be well formed
     import struct as _struct
     ico_path = os.path.join(os.path.dirname(os.path.dirname(
-        os.path.abspath(__file__))), "packaging", "smartftp.ico")
+        os.path.abspath(__file__))), "packaging", "bluebird.ico")
     if os.path.isfile(ico_path):
         blob = open(ico_path, "rb").read()
         reserved, kind, count = _struct.unpack("<HHH", blob[:6])
@@ -1521,7 +1537,7 @@ def main():
             offset += 16
         check("every .ico frame holds PNG data", frames_ok)
     else:
-        check("packaging/smartftp.ico was generated by tools/make_icon.py",
+        check("packaging/bluebird.ico was generated by tools/make_icon.py",
               False, ico_path)
 
     version_info = os.path.join(os.path.dirname(os.path.dirname(

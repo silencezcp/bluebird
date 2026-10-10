@@ -507,6 +507,9 @@ ZH: Dict[str, str] = {
     "Could not connect to %s.": "无法连接到 %s。",
     "Connected to %s.": "已连接到 %s。",
     "The server reported:": "服务器返回：",
+    "the blue bird that carries letters": "传书的青鸟",
+    "BlueBird is the bird that carried letters":
+        "BlueBird 即传说中传书的青鸟",
     "Host": "主机",
     "Protocol": "协议",
     "User": "用户名",

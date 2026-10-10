@@ -6,7 +6,7 @@ __pycache__/
 build/
 dist/
 *.spec.bak
-smartftp-startup.log
+bluebird-startup.log
 .smoke/
 .smoketest/
 COMMIT_MSG.txt
@@ -17,3 +17,4 @@ MSG_COMMIT.txt
 MSG_SFTP.txt
 MSG_RENAME.txt
 MSG_CLI.txt
+MSG_BLUEBIRD.txt

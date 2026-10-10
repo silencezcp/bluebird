@@ -1,4 +1,4 @@
-"""Command line interface for Smart FTP.
+"""Command line interface for BlueBird.
 
 Shares the whole networking layer with the GUI: :mod:`ftpclient.session` does
 the protocol work and :mod:`ftpclient.transfer` plans recursive jobs, so the two
@@ -7,12 +7,12 @@ CLI usable in scripts and on machines without a display.
 
 Examples::
 
-    smartftp ls sftp://silence@192.168.31.142:22
-    smartftp get sftp://silence@host/pub/file.bin -d C:\\Temp
-    smartftp put ./build.zip ftp://user@host -r /releases
-    smartftp mirror sftp://user@host -r /var/www -d ./www --delete
-    smartftp stat ftp://user@host -r /pub/report.pdf
-    smartftp ls --saved fa2oa
+    bluebird ls sftp://silence@192.168.31.142:22
+    bluebird get sftp://silence@host/pub/file.bin -d C:\\Temp
+    bluebird put ./build.zip ftp://user@host -r /releases
+    bluebird mirror sftp://user@host -r /var/www -d ./www --delete
+    bluebird stat ftp://user@host -r /pub/report.pdf
+    bluebird ls --saved fa2oa
 """
 
 from __future__ import annotations
@@ -36,7 +36,7 @@ EXIT_OK = 0
 EXIT_ERROR = 1
 EXIT_USAGE = 2
 
-PROGRAM = "smartftp"
+PROGRAM = "bluebird"
 
 
 class CliError(Exception):
@@ -217,7 +217,7 @@ def resolve_connection(args: argparse.Namespace) -> Dict[str, Any]:
     if getattr(args, "verify_host_key", False):
         config["verify_host_key"] = True
 
-    env_password = os.environ.get("SMART_FTP_PASSWORD") or \
+    env_password = os.environ.get("BLUEBIRD_PASSWORD") or \
         os.environ.get("NACRE_FTP_PASSWORD")
     if env_password and not config.get("password"):
         config["password"] = env_password
@@ -243,7 +243,7 @@ def ask_password(config: Dict[str, Any]) -> None:
         return
     if not sys.stdin.isatty():
         raise CliError("no password given (use --password, "
-                       "SMART_FTP_PASSWORD, or a saved connection)")
+                       "BLUEBIRD_PASSWORD, or a saved connection)")
     prompt = "%s@%s's password: " % (config.get("user") or "anonymous",
                                      config.get("host"))
     try:
@@ -820,7 +820,7 @@ def _add_connection_options(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--saved", metavar="NAME",
                         help="use a connection from config.ini")
     parser.add_argument("--user", help="user name")
-    parser.add_argument("--password", help="password (also SMART_FTP_PASSWORD)")
+    parser.add_argument("--password", help="password (also BLUEBIRD_PASSWORD)")
     parser.add_argument("--key", dest="key", metavar="FILE",
                         help="private key file for SFTP")
     parser.add_argument("--protocol", choices=["ftp", "ftps", "sftp"],

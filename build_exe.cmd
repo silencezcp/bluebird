@@ -1,7 +1,7 @@
 @echo off
 rem ---------------------------------------------------------------------------
-rem  Build dist\SmartFTP\SmartFTP.exe with the bundled Python 3.8.
-rem  Output: dist\SmartFTP\  (exe + docs\ + Qt runtime)
+rem  Build dist\BlueBird\BlueBird.exe with the bundled Python 3.8.
+rem  Output: dist\BlueBird\  (exe + docs\ + Qt runtime)
 rem ---------------------------------------------------------------------------
 setlocal
 set "PY=D:\DSH_Workspaces\Ftp\python.exe"
@@ -17,16 +17,16 @@ echo === regenerating the icon and version resource ===
 
 echo.
 echo === packaging with PyInstaller ===
-"%PY%" -m PyInstaller --clean --noconfirm packaging\SmartFTP.spec || goto :fail
+"%PY%" -m PyInstaller --clean --noconfirm packaging\BlueBird.spec || goto :fail
 
 echo.
 echo === self test of the packaged build ===
-dist\SmartFTP\SmartFTP.exe --selftest || goto :fail
+dist\BlueBird\BlueBird.exe --selftest || goto :fail
 echo.
-type dist\SmartFTP\smartftp-startup.log 2>nul
+type dist\BlueBird\bluebird-startup.log 2>nul
 
 echo.
-echo Build finished: dist\SmartFTP\SmartFTP.exe
+echo Build finished: dist\BlueBird\BlueBird.exe
 exit /b 0
 
 :fail

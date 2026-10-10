@@ -1,8 +1,8 @@
 #!/usr/bin/env python
-"""Command line front end for Smart FTP.
+"""Command line front end for BlueBird.
 
-    python smartftp.py ls sftp://user@host:22
-    python smartftp.py --help
+    python bluebird.py ls sftp://user@host:22
+    python bluebird.py --help
 
 The same thing without a wrapper script::
 

@@ -14,10 +14,10 @@ echo ==== command line client ====
 "%PY%" tests\test_cli.py || goto :fail
 echo.
 echo ==== packaged build (skipped when dist\ is absent) ====
-if exist "dist\SmartFTP\SmartFTP.exe" (
-    dist\SmartFTP\SmartFTP.exe --selftest || goto :fail
+if exist "dist\BlueBird\BlueBird.exe" (
+    dist\BlueBird\BlueBird.exe --selftest || goto :fail
 ) else (
-    echo dist\SmartFTP\SmartFTP.exe not built - run build_exe.cmd first
+    echo dist\BlueBird\BlueBird.exe not built - run build_exe.cmd first
 )
 echo.
 echo All test suites passed.

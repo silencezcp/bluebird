@@ -266,7 +266,7 @@ class MainWindow(QMainWindow):
         self._overwrite_all = False
         #: the test suite runs windowless, so it can mute the status dialogs
         self._quiet_dialogs = bool(
-            os.environ.get("SMART_FTP_QUIET_DIALOGS", ""))
+            os.environ.get("BLUEBIRD_QUIET_DIALOGS", ""))
         #: the last connection error, kept for the tests and the status line
         self._last_connection_error = ""
         # a member timer (not a bare singleShot) so it can be cancelled when
@@ -276,7 +276,7 @@ class MainWindow(QMainWindow):
         self._flush_timer.setInterval(400)
         self._flush_timer.timeout.connect(self._flush_transfer_results)
 
-        self.setWindowTitle(__appname__)
+        self.setWindowTitle(self._product_title())
         self.setWindowIcon(self._window_icon())
 
         self.local_pane = FilePane("local", "Local site", theme, icons, settings, self)
@@ -317,9 +317,14 @@ class MainWindow(QMainWindow):
             self.bottom_tabs.setTabText(1, "  %s  " % T("Log"))
             self._refresh_recent_menu()
             self._sync_view_menu()
+            # the product name is 青鸟 in Chinese, BlueBird in English
             self._refresh_status()
         except RuntimeError:
             pass
+
+    def _product_title(self) -> str:
+        from . import display_name
+        return display_name()
 
     def changeEvent(self, event: Any) -> None:  # noqa: N802
         """Qt sends LanguageChange when the application language flips."""
@@ -569,11 +574,11 @@ class MainWindow(QMainWindow):
             self.status_connection.setText(T("Connected to %s%s") % (
                 (T("“%s” — ") % label) if label else "", self.session.describe()))
             # a compact title keeps the connection bar from being squeezed
-            self.setWindowTitle("%s  [%s]" % (__appname__,
+            self.setWindowTitle("%s  [%s]" % (self._product_title(),
                                               label or T("connected")))
         else:
             self.status_connection.setText(T("Not connected"))
-            self.setWindowTitle(__appname__)
+            self.setWindowTitle(self._product_title())
         queue_text = self.manager.summary() if self.manager.items else ""
         active = self.manager.active()
         if active:
@@ -1784,7 +1789,7 @@ class MainWindow(QMainWindow):
 
     def save_log(self) -> None:
         path, _ = QFileDialog.getSaveFileName(
-            self, "Save log", "smartftp-log.txt", "Text files (*.txt)")
+            self, "Save log", "bluebird-log.txt", "Text files (*.txt)")
         if not path:
             return
         try:
@@ -1870,13 +1875,21 @@ class MainWindow(QMainWindow):
                                     T("Could not open %s") % folder)
 
     def show_about(self) -> None:
+        from . import __appname_cn__
+        name = self._product_title()
         QMessageBox.about(
-            self, T("About %s") % __appname__,
+            self, T("About %s") % name,
             "<h3>%s %s</h3>"
+            "<p style='color:#5C6B7A'>%s</p>"
             "<p>%s</p>"
             "<p>%s</p>"
             "<p style='color:#8A8072'>%s<br>Python %s</p>"
-            % (__appname__, __version__,
+            % (name, __version__,
+               # the Chinese name is the product name, not a translation of it
+               "%s \u2014 %s" % (__appname_cn__,
+                                 T("the blue bird that carries letters"))
+               if name.startswith(__appname_cn__) else
+               T("BlueBird is the bird that carried letters"),
                T("A cream-themed FTP / FTPS / SFTP client built with PyQt5, "
                  "PyQtWebEngine and paramiko."),
                T("Every colour is yours to change: open "

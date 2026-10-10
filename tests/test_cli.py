@@ -56,7 +56,7 @@ def run(argv, expect=0, label=""):
 
 
 def main() -> int:
-    workdir = tempfile.mkdtemp(prefix="smartftp-cli-")
+    workdir = tempfile.mkdtemp(prefix="bluebird-cli-")
     server_root = os.path.join(workdir, "server")
     local_root = os.path.join(workdir, "client")
     os.makedirs(server_root)
@@ -243,7 +243,7 @@ def main() -> int:
         server = TestFTPServer(server_root)
         host, port = server.start()
         url = "ftp://tester:secret@%s:%d" % (host, port)
-        os.environ["SMART_FTP_PASSWORD"] = "secret"
+        os.environ["BLUEBIRD_PASSWORD"] = "secret"
         try:
             code, text, _r = run(["ls", url], label="ls lists the server")
             check("ls shows a file", "readme.txt" in text, text[:120])

@@ -62,7 +62,7 @@ def main():
         print("\n-- connect --")
         ftp.connect()
         check("connect", ftp.connected)
-        check("banner", "Smart" in (ftp.banner or ""), ftp.banner)
+        check("banner", "BlueBird" in (ftp.banner or ""), ftp.banner)
 
         print("\n-- listing --")
         entries = ftp.listdir()

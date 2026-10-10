@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Launch the Smart FTP client.
+"""Launch the BlueBird client.
 
     python run.py
     python run.py sftp://user@host:22

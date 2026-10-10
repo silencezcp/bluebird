@@ -1,4 +1,4 @@
-# Smart FTP — 现代奶白色 FTP / FTPS / SFTP 客户端
+# 青鸟 BlueBird — 现代奶白色 FTP / FTPS / SFTP 客户端
 
 **作者：silence** ｜ 版本 1.0.0
 
@@ -8,11 +8,15 @@ FTP/SFTP 双栏客户端，界面参考 **FileZilla Client** 的信息架构，�
 
 ![应用图标](docs/screenshots/21-app-icon.png)
 
-应用图标是**代码画出来的**（`ftpclient/appicon.py`，用 QPainter 绘制一朵云 +
-FTP 字样 + 三个绿色节点），所以任何尺寸都清晰、也不会随附二进制素材：
+> **名字的由来**：青鸟是中国神话中为王母取食、**传书**的信使鸟，「青鸟传信」
+> 即传递音讯。做文件传输客户端，没有比这更贴切的名字。界面语言为中文时显示
+> 「**青鸟 BlueBird**」，英文时显示「BlueBird」。
+
+应用图标是**代码画出来的**（`ftpclient/appicon.py`，用 QPainter 绘制一只
+**衔着信件的青鸟**），所以任何尺寸都清晰、也不会随附二进制素材：
 
 ```bat
-:: 重新生成 packaging\smartftp.ico（7 种尺寸）与 version_info.txt（含作者）
+:: 重新生成 packaging\bluebird.ico（7 种尺寸）与 version_info.txt（含作者）
 D:\DSH_Workspaces\Ftp\python.exe tools\make_icon.py
 ```
 
@@ -24,14 +28,14 @@ D:\DSH_Workspaces\Ftp\python.exe tools\make_icon.py
 **命令行**（**不需要 PyQt5**，可在无桌面环境运行；脚本里很好用）：
 
 ```bat
-smartftp.cmd ls sftp://silence@192.168.31.142:22          :: 列目录
-smartftp.cmd ls -l --saved fa2oa                          :: 用已保存的连接
-smartftp.cmd get sftp://user@host -r /pub/a.bin -d C:\Temp
-smartftp.cmd put .\build.zip ftp://user@host -r /releases
-smartftp.cmd mirror sftp://user@host -r /var/www -d .\www --delete
-smartftp.cmd stat ftp://user@host -r /pub/report.pdf
-smartftp.cmd sites                                        :: 列出已保存连接
-smartftp.cmd --help
+bluebird.cmd ls sftp://silence@192.168.31.142:22          :: 列目录
+bluebird.cmd ls -l --saved fa2oa                          :: 用已保存的连接
+bluebird.cmd get sftp://user@host -r /pub/a.bin -d C:\Temp
+bluebird.cmd put .\build.zip ftp://user@host -r /releases
+bluebird.cmd mirror sftp://user@host -r /var/www -d .\www --delete
+bluebird.cmd stat ftp://user@host -r /pub/report.pdf
+bluebird.cmd sites                                        :: 列出已保存连接
+bluebird.cmd --help
 ```
 
 | 命令 | 作用 |
@@ -50,21 +54,21 @@ smartftp.cmd --help
 
 - 目标写法 `sftp://user@host:22`、`ftp://user:pass@host`、`user@host`，
   也可以直接用 `--saved 连接名`
-- 密码优先用 `SMART_FTP_PASSWORD` 环境变量（**不要写进脚本或历史记录**）
+- 密码优先用 `BLUEBIRD_PASSWORD` 环境变量（**不要写进脚本或历史记录**）
 - **退出码**：`0` 成功、`1` 出错、`2` 用法错误，方便 `if` 判断
 - **`get`/`put` 默认不覆盖**已存在的文件，要覆盖请加 `-f/--force`
 - 进度和提示走 **stderr**，stdout 只放数据，所以 `--json` 可以安全管道给别的程序
 - 等价的免脚本写法：`python -m ftpclient.cli <命令>`
   （`python -m ftpclient` **不带** `.cli` 仍然是启动图形界面）
 
-`smartftp.cmd` / `smartftp.py` 在项目根目录；也可以用 exe 版本（见 2.5 节）。
+`bluebird.cmd` / `bluebird.py` 在项目根目录；也可以用 exe 版本（见 2.5 节）。
 
 exe 的版本资源里也写入了作者：
 
 | 字段 | 值 |
 |---|---|
 | CompanyName | silence |
-| FileDescription | Smart FTP - FTP / FTPS / SFTP client |
+| FileDescription | BlueBird - FTP / FTPS / SFTP client |
 | LegalCopyright | Copyright (c) 2026 silence |
 | Comments | Author: silence <2446522180@qq.com> |
 
@@ -249,7 +253,7 @@ D:\DSH_Workspaces\Ftp\python.exe -m pip install -r requirements.txt ^
 
 ## 2.5 打包成 exe
 
-`dist\SmartFTP\SmartFTP.exe` 是免安装版（**约 282 MB**，不需要装 Python）。
+`dist\BlueBird\BlueBird.exe` 是免安装版（**约 282 MB**，不需要装 Python）。
 重新打包：
 
 ```bat
@@ -262,16 +266,16 @@ build_exe.cmd
 
 ```bat
 D:\DSH_Workspaces\Ftp\python.exe -m PyInstaller --clean --noconfirm ^
-    packaging\SmartFTP.spec
+    packaging\BlueBird.spec
 ```
 
 | 项目 | 说明 |
 |---|---|
-| 输出 | `dist\SmartFTP\`（**ondir 模式**，不是单文件） |
+| 输出 | `dist\BlueBird\`（**ondir 模式**，不是单文件） |
 | 为什么不用单文件 | 单文件每次启动都要把约 280 MB 解压到临时目录，很慢；on-dir 秒开 |
-| 手册位置 | `dist\SmartFTP\docs\`（**和 exe 同级**，可直接替换成你自己的版本） |
-| 自检 | `SmartFTP.exe --selftest` → 写 `smartftp-startup.log` |
-| 版本号 | `SmartFTP.exe --version` |
+| 手册位置 | `dist\BlueBird\docs\`（**和 exe 同级**，可直接替换成你自己的版本） |
+| 自检 | `BlueBird.exe --selftest` → 写 `bluebird-startup.log` |
+| 版本号 | `BlueBird.exe --version` |
 | 体积构成 | `Qt5WebEngineCore.dll` 97 MB（内置手册渲染必须）、`opengl32sw.dll` 20 MB（无显卡驱动的机器需要）、Qt 其它库 |
 
 **已验证**：`--selftest` 在打包后报告 `frozen: True`、手册 HTML/PDF 均能找到、
@@ -289,15 +293,15 @@ QtWebEngine 可用、主窗口构建成功、**手册页面真实渲染完成**�
 **每次连接成功后都会自动保存**，不需要额外勾选。保存位置：
 
 ```
-%APPDATA%\.smartftp\config.ini
+%APPDATA%\.bluebird\config.ini
 ```
 
-（可用环境变量 `SMART_FTP_CONFIG` 指定别的路径；偏好设置也会有同样路径的提示）
+（可用环境变量 `BLUEBIRD_CONFIG` 指定别的路径；偏好设置也会有同样路径的提示）
 
 文件内容就是普通 INI，可以直接用记事本编辑、备份或拷到别的机器：
 
 ```ini
-# Smart FTP - saved server connections
+# BlueBird - saved server connections
 # One section per connection. Passwords are stored in clear text: keep this file private.
 
 [Production web server]
@@ -386,7 +390,7 @@ order = Production web server,Backup NAS
   * 直接输入十六进制值（`#2E6FA8`）；
   * 点 **Pick…** 打开取色器；
   * 点 **Reset** 恢复该项默认值，**Reset all** 恢复整套默认。
-* 顶部有 4 套预设主题：**Smart (cream)**（默认奶白）、**Cloud**、**Matcha**、
+* 顶部有 4 套预设主题：**BlueBird (cream)**（默认奶白）、**Cloud**、**Matcha**、
   **Linen (dark)**。
 
 ### 文件夹与文件的颜色关系
@@ -411,8 +415,8 @@ order = Production web server,Backup NAS
 所有颜色改动都是**即时预览**：改一下颜色，两个面板、图标、队列立刻更新；
 点 `Cancel` 会还原成打开设置前的样子。
 
-设置保存在 `%APPDATA%\.smartftp\settings.json`（可以用环境变量
-`SMART_FTP_SETTINGS` 指定别的路径）。
+设置保存在 `%APPDATA%\.bluebird\settings.json`（可以用环境变量
+`BLUEBIRD_SETTINGS` 指定别的路径）。
 
 ---
 
@@ -425,7 +429,7 @@ Ftp Client/
 ├─ build_exe.cmd              重建手册 → PyInstaller 打包 → 自检
 ├─ requirements.txt
 ├─ packaging/
-│  └─ SmartFTP.spec           PyInstaller 配置（on-dir、剔除无用 Qt 模块）
+│  └─ BlueBird.spec           PyInstaller 配置（on-dir、剔除无用 Qt 模块）
 ├─ ftpclient/
 │  ├─ app.py                  引导、高 DPI、异常兜底、URL 参数、--selftest
 │  ├─ main.py                 主窗口：连接栏、双栏、队列、日志、全部业务动作
@@ -456,7 +460,7 @@ Ftp Client/
 │  ├─ 用户手册.html           自包含 HTML（截图已内嵌）
 │  ├─ 用户手册.pdf            A4 打印版
 │  └─ screenshots/
-└─ dist/SmartFTP/             打包产物（SmartFTP.exe + docs/ + Qt 运行时）
+└─ dist/BlueBird/             打包产物（BlueBird.exe + docs/ + Qt 运行时）
 ```
 
 设计上有意把**网络层和界面层完全分开**：`session.py` 和 `transfer.py` 里没有

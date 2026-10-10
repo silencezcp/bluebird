@@ -4,8 +4,9 @@ No binary asset is checked in: the artwork is described once here and rendered
 at whatever size is needed, which keeps it crisp from a 16 px title bar up to a
 256 px executable icon.
 
-The design is a soft blue cloud carrying the letters **FTP**, sitting on a
-network of three green nodes joined by a bus - a file server in the cloud.
+The design is the messenger of the blue bird (青鸟传信): a blue bird climbing
+to the upper right with a sealed letter in its beak.  The letter is what makes
+it a file-transfer client rather than just a bird.
 """
 
 from __future__ import annotations
@@ -16,14 +17,19 @@ from typing import Any, List, Optional, Tuple
 # ---------------------------------------------------------------------------
 # palette
 # ---------------------------------------------------------------------------
-CLOUD_TOP = "#D3E7F7"        # light blue, top of the cloud
-CLOUD_BOTTOM = "#B4D6F0"     # slightly deeper at the bottom edge
-CLOUD_EDGE = "#9FC6E8"       # subtle outline
-LETTER = "#22293A"           # near-black navy for "FTP"
-BUS = "#22293A"              # the cable between the nodes
-NODE = "#6CC24A"             # green nodes
-NODE_DARK = "#4E9E33"        # shading on the lower half of a node
-NODE_CORE = "#FFFFFF"        # white square inside a node
+BODY = "#4FA8E0"             # blue bird, main plumage
+BODY_DARK = "#2E7CB8"        # underside and shading
+BODY_LIGHT = "#7CC4EE"       # sunlit upper edge
+WING = "#2F79B5"             # the far wing, a step darker
+WING_EDGE = "#256494"
+BELLY = "#EAF5FD"            # pale breast
+BEAK = "#F5A623"             # horn coloured beak
+BEAK_DARK = "#D18A12"
+EYE = "#1E2A38"
+LETTER = "#FFFFFF"           # the sealed letter
+LETTER_FOLD = "#8FB4D1"      # fold lines on the letter
+LETTER_EDGE = "#5E8CB0"      # its outline, dark enough to read at 16 px
+TRAIL = "#9CC9E8"            # the flight trail behind the bird
 
 
 def _qcolor(value: str, alpha: int = 255) -> Any:
@@ -34,96 +40,153 @@ def _qcolor(value: str, alpha: int = 255) -> Any:
     return color
 
 
+def _qpoint(x: float, y: float) -> Any:
+    from PyQt5.QtCore import QPointF
+    return QPointF(x, y)
+
+
+def _draw_bird(painter: Any, unit: float) -> None:
+    """Paint the blue bird at a 64 unit scale (the caller has scaled)."""
+    from PyQt5.QtCore import QPointF, QRectF, Qt
+    from PyQt5.QtGui import (QBrush, QLinearGradient, QPainterPath, QPen)
+
+    # -- flight trail: two tapering arcs behind the bird -----------------
+    trail_pen = QPen(_qcolor(TRAIL, 150))
+    trail_pen.setCapStyle(Qt.RoundCap)
+    for offset, weight in ((0.0, 2.4), (4.6, 1.6)):
+        path = QPainterPath()
+        path.moveTo(4.0, 34.0 + offset)
+        path.cubicTo(11.0, 30.0 + offset, 16.0, 27.0 + offset,
+                     21.0, 25.5 + offset)
+        pen = QPen(trail_pen)
+        pen.setWidthF(weight)
+        painter.setPen(pen)
+        painter.setBrush(Qt.NoBrush)
+        painter.drawPath(path)
+    painter.setPen(Qt.NoPen)
+
+    # -- tail: a swept triangle, rearmost so it sits under the body ------
+    tail = QPainterPath()
+    tail.moveTo(30.0, 36.0)
+    tail.lineTo(9.0, 43.5)
+    tail.lineTo(11.5, 47.5)
+    tail.lineTo(31.0, 44.0)
+    tail.closeSubpath()
+    painter.setBrush(QBrush(_qcolor(WING)))
+    painter.setPen(QPen(_qcolor(WING_EDGE), 0.8))
+    painter.drawPath(tail)
+
+    # -- body: an ellipse rotated so the bird climbs to the right --------
+    gradient = QLinearGradient(24.0, 24.0, 44.0, 50.0)
+    gradient.setColorAt(0.0, _qcolor(BODY_LIGHT))
+    gradient.setColorAt(0.45, _qcolor(BODY))
+    gradient.setColorAt(1.0, _qcolor(BODY_DARK))
+    painter.save()
+    painter.translate(38.0, 37.0)
+    painter.rotate(-24.0)
+    body = QRectF(-14.5, -9.5, 29.0, 19.0)
+    painter.setBrush(QBrush(gradient))
+    painter.setPen(QPen(_qcolor(BODY_DARK), 1.0))
+    painter.drawEllipse(body)
+    painter.restore()
+
+    # -- pale breast along the lower front of the body -------------------
+    breast = QPainterPath()
+    breast.moveTo(43.0, 30.0)
+    breast.cubicTo(50.0, 33.0, 50.0, 41.0, 42.0, 45.0)
+    breast.cubicTo(44.5, 40.0, 45.5, 34.5, 43.0, 30.0)
+    breast.closeSubpath()
+    painter.setBrush(QBrush(_qcolor(BELLY)))
+    painter.setPen(Qt.NoPen)
+    painter.drawPath(breast)
+
+    # -- head ------------------------------------------------------------
+    head = QPointF(47.5, 25.5)
+    painter.setBrush(QBrush(_qcolor(BODY)))
+    painter.setPen(QPen(_qcolor(BODY_DARK), 1.0))
+    painter.drawEllipse(head, 7.6, 7.4)
+
+    # -- beak: two halves, meeting at a point to the upper right ---------
+    for points, colour in (
+            ([(53.0, 22.4), (61.4, 19.6), (53.4, 25.6)], BEAK),
+            ([(53.4, 26.0), (61.4, 19.6), (52.4, 28.4)], BEAK_DARK)):
+        beak = QPainterPath()
+        beak.moveTo(*points[0])
+        beak.lineTo(*points[1])
+        beak.lineTo(*points[2])
+        beak.closeSubpath()
+        painter.setBrush(QBrush(_qcolor(colour)))
+        painter.setPen(Qt.NoPen)
+        painter.drawPath(beak)
+
+    # -- eye -------------------------------------------------------------
+    painter.setBrush(QBrush(_qcolor(EYE)))
+    painter.drawEllipse(QPointF(49.4, 24.6), 1.85, 1.85)
+    painter.setBrush(QBrush(_qcolor("#FFFFFF", 210)))
+    painter.drawEllipse(QPointF(50.1, 23.9), 0.62, 0.62)
+
+    # -- near wing, sweeping forward over the body -----------------------
+    wing = QPainterPath()
+    wing.moveTo(35.0, 30.0)
+    wing.cubicTo(43.0, 28.0, 46.0, 34.0, 42.0, 40.5)
+    wing.cubicTo(38.0, 45.5, 30.0, 47.0, 25.0, 45.0)
+    wing.cubicTo(29.0, 38.5, 31.0, 33.0, 35.0, 30.0)
+    wing.closeSubpath()
+    painter.setBrush(QBrush(_qcolor(WING)))
+    painter.setPen(QPen(_qcolor(WING_EDGE), 0.9))
+    painter.drawPath(wing)
+    # two feather lines inside the wing
+    feather_pen = QPen(_qcolor(WING_EDGE, 200))
+    feather_pen.setWidthF(0.9)
+    painter.setPen(feather_pen)
+    painter.setBrush(Qt.NoBrush)
+    for drop in (2.6, 5.0):
+        line = QPainterPath()
+        line.moveTo(34.0 + drop * 0.4, 32.5 + drop)
+        line.cubicTo(37.5, 36.0 + drop * 0.5, 37.0, 39.0 + drop * 0.4,
+                     34.0, 42.0 + drop * 0.35)
+        painter.drawPath(line)
+    painter.setPen(Qt.NoPen)
+
+    # -- the letter, gripped in the beak ---------------------------------
+    # the beak tip is at (61.4, 19.6).  The letter is placed so that tip sits
+    # just inside its lower left corner, which is what makes it read as carried
+    # rather than as a separate envelope floating past the bird.
+    painter.save()
+    painter.translate(56.4, 15.4)
+    painter.rotate(22.0)
+    letter = QRectF(-7.0, -4.0, 14.0, 10.0)
+    painter.setBrush(QBrush(_qcolor(LETTER)))
+    painter.setPen(QPen(_qcolor(LETTER_EDGE), 1.0))
+    painter.drawRoundedRect(letter, 1.2, 1.2)
+    # the flap: a wide V from the top corners down to the middle
+    flap = QPainterPath()
+    flap.moveTo(letter.left() + 1.0, letter.top() + 1.1)
+    flap.lineTo(0.0, letter.top() + 5.4)
+    flap.lineTo(letter.right() - 1.0, letter.top() + 1.1)
+    painter.setBrush(Qt.NoBrush)
+    painter.setPen(QPen(_qcolor(LETTER_FOLD), 1.1))
+    painter.drawPath(flap)
+    painter.restore()
+
+
+
 def draw_icon(painter: Any, size: int) -> None:
     """Paint the icon into ``painter`` inside a ``size`` x ``size`` box."""
-    from PyQt5.QtCore import QPointF, QRectF, Qt
-    from PyQt5.QtGui import (QBrush, QFont, QLinearGradient, QPainterPath,
-                             QPen)
+    from PyQt5.QtGui import QPainter
+    from PyQt5.QtCore import Qt
 
-    painter.setRenderHint(painter.Antialiasing, True)
-    painter.setRenderHint(painter.TextAntialiasing, True)
+    painter.setRenderHint(QPainter.Antialiasing, True)
+    painter.setRenderHint(QPainter.SmoothPixmapTransform, True)
 
-    # work on a 64 unit grid so every measurement below is size independent
+    # everything below is measured on a 64 unit grid, so one scale call makes
+    # the artwork size independent
     unit = size / 64.0
     painter.save()
     painter.scale(unit, unit)
     painter.setPen(Qt.NoPen)
-
-    # -- the cloud ------------------------------------------------------
-    # three lobes over a rounded slab, which reads as one cloud outline
-    lobes = (
-        # (centre x, centre y, radius)
-        (20.0, 17.5, 11.0),      # left lobe
-        (32.0, 13.5, 14.0),      # tall middle lobe
-        (44.5, 18.0, 10.5),      # right lobe
-    )
-    body = QRectF(11.0, 18.0, 42.0, 15.5)
-
-    cloud = QPainterPath()
-    cloud.addRoundedRect(body, 7.5, 7.5)
-    for cx, cy, radius in lobes:
-        lobe = QPainterPath()
-        lobe.addEllipse(QPointF(cx, cy), radius, radius)
-        cloud = cloud.united(lobe)
-
-    gradient = QLinearGradient(0.0, 6.0, 0.0, 34.0)
-    gradient.setColorAt(0.0, _qcolor(CLOUD_TOP))
-    gradient.setColorAt(1.0, _qcolor(CLOUD_BOTTOM))
-    painter.setBrush(QBrush(gradient))
-    painter.setPen(QPen(_qcolor(CLOUD_EDGE), 1.2))
-    painter.drawPath(cloud.simplified())
-    painter.setPen(Qt.NoPen)
-
-    # -- "FTP" ----------------------------------------------------------
-    font = QFont()
-    font.setBold(True)
-    font.setPixelSize(17)
-    font.setLetterSpacing(QFont.AbsoluteSpacing, 0.4)
-    painter.setFont(font)
-    painter.setPen(QPen(_qcolor(LETTER)))
-    painter.drawText(QRectF(9.0, 14.5, 46.0, 18.0),
-                     int(Qt.AlignCenter), "FTP")
-    painter.setPen(Qt.NoPen)
-
-    # -- the network bus and its three nodes ---------------------------
-    # the nodes sit *below* the cable and do not touch each other
-    bus_y = 45.0
-    stem = QRectF(30.6, 31.0, 2.8, 12.5)
-    painter.setBrush(QBrush(_qcolor(BUS)))
-    painter.drawRoundedRect(stem, 1.2, 1.2)
-
-    bus = QRectF(16.0, bus_y - 2.2, 32.0, 4.0)
-    painter.drawRoundedRect(bus, 1.6, 1.6)
-
-    node_radius = 7.4
-    node_centre_y = bus_y + 5.8
-    for cx in (16.0, 32.0, 48.0):
-        node = QRectF(cx - node_radius, node_centre_y - node_radius,
-                      node_radius * 2, node_radius * 2)
-        painter.setBrush(QBrush(_qcolor(NODE)))
-        painter.drawEllipse(node)
-        # lower half slightly darker for a little depth
-        shade = QPainterPath()
-        shade.addEllipse(node)
-        clip = QRectF(node.left(), node.center().y(),
-                      node.width(), node.height() / 2.0 + 0.5)
-        painter.setBrush(QBrush(_qcolor(NODE_DARK, 80)))
-        painter.drawPath(shade.intersected(_path_from_rect(clip)).simplified())
-        # white square core
-        core = node_radius * 0.72
-        painter.setBrush(QBrush(_qcolor(NODE_CORE)))
-        painter.drawRoundedRect(
-            QRectF(cx - core / 2.0, node_centre_y - core / 2.0, core, core),
-            core * 0.24, core * 0.24)
-
+    _draw_bird(painter, unit)
     painter.restore()
-
-
-def _path_from_rect(rect: Any) -> Any:
-    from PyQt5.QtGui import QPainterPath
-    path = QPainterPath()
-    path.addRect(rect)
-    return path
 
 
 def pixmap(size: int = 64) -> Any:
@@ -216,10 +279,10 @@ def write_assets(folder: str) -> List[str]:
     written: List[str] = []
     if not os.path.isdir(folder):
         os.makedirs(folder)
-    png = os.path.join(folder, "smartftp.png")
+    png = os.path.join(folder, "bluebird.png")
     if save_png(png, 256):
         written.append(png)
-    ico = os.path.join(folder, "smartftp.ico")
+    ico = os.path.join(folder, "bluebird.ico")
     if save_ico(ico):
         written.append(ico)
     return written

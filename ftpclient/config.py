@@ -2,9 +2,9 @@
 
 Two files are used:
 
-* ``~/.smartftp/settings.json`` - application preferences and the colour
+* ``~/.bluebird/settings.json`` - application preferences and the colour
   palette (nested data, JSON is the right fit).
-* ``~/.smartftp/config.ini`` - **saved server connections**, one INI section
+* ``~/.bluebird/config.ini`` - **saved server connections**, one INI section
   per connection, so they are easy to hand-edit and to share.
 
 Python 3.8 compatible: no walrus operators, no ``dict | dict``.
@@ -20,8 +20,8 @@ import re
 import threading
 from typing import Any, Dict, List, Optional, Tuple
 
-APP_NAME = "Smart FTP"
-APP_SLUG = "smartftp"
+APP_NAME = "BlueBird"
+APP_SLUG = "bluebird"
 
 # --------------------------------------------------------------------------
 # Colour palette
@@ -129,7 +129,7 @@ COLOR_GROUPS: List[Tuple[str, List[Tuple[str, str]]]] = [
 
 #: Ready-made palettes.  ``None`` means "use DEFAULT_PALETTE".
 PRESETS: Dict[str, Optional[Dict[str, str]]] = {
-    "Smart (cream)": None,
+    "BlueBird (cream)": None,
     "Cloud": {
         "window": "#F4F6F9", "surface": "#FFFFFF", "surface_alt": "#F8FAFC",
         "surface_sunken": "#EDF1F6", "surface_hover": "#EEF3F9",
@@ -369,7 +369,7 @@ class ConnectionStore(object):
                     os.makedirs(directory)
                 tmp = self.path + ".tmp"
                 with open(tmp, "w", encoding="utf-8") as handle:
-                    handle.write("# Smart FTP - saved server connections\n")
+                    handle.write("# BlueBird - saved server connections\n")
                     handle.write("# One section per connection. Passwords are "
                                  "stored in clear text: keep this file private.\n\n")
                     parser.write(handle)
@@ -732,11 +732,12 @@ class Settings(object):
         return value if isinstance(value, list) else []
 
 
-#: the folder this application used before it was renamed; existing installs
-#: are migrated from here so saved connections are not orphaned
-LEGACY_APP_SLUG = "nacreftp"
-LEGACY_ENV_SETTINGS = "NACRE_FTP_SETTINGS"
-LEGACY_ENV_CONFIG = "NACRE_FTP_CONFIG"
+#: Folders this application used before it was renamed, newest first.  Existing
+#: installs are migrated from here so saved connections are not orphaned; the
+#: list grows by one every time the product is renamed.
+LEGACY_APP_SLUGS = ("smartftp", "nacreftp")
+LEGACY_ENV_SETTINGS = ("SMART_FTP_SETTINGS", "NACRE_FTP_SETTINGS")
+LEGACY_ENV_CONFIG = ("SMART_FTP_CONFIG", "NACRE_FTP_CONFIG")
 
 
 def _env(*names: str) -> str:
@@ -748,48 +749,58 @@ def _env(*names: str) -> str:
     return ""
 
 
-def legacy_settings_dir() -> str:
-    """Where the pre-rename version kept its files (may not exist)."""
+def legacy_settings_dirs() -> List[str]:
+    """Folders the earlier names used, newest first (they may not exist)."""
     base = os.environ.get("APPDATA") or os.path.expanduser("~")
-    return os.path.join(base, "." + LEGACY_APP_SLUG)
+    return [os.path.join(base, "." + slug) for slug in LEGACY_APP_SLUGS]
+
+
+def legacy_settings_dir() -> str:
+    """The most recent pre-rename folder, for messages and tests."""
+    return legacy_settings_dirs()[0]
 
 
 def migrate_legacy_config() -> List[str]:
-    """Copy settings/connections over from the old name, once.
+    """Copy settings/connections over from an earlier name, once.
 
-    The old files are left in place: this only ever reads them, so a user who
-    goes back to the previous build still finds everything.
+    Every old folder is tried in turn, newest first, and only files that do not
+    exist yet are copied.  The originals are left in place: this only ever
+    reads them, so a user who rolls back to a previous build still finds
+    everything.
     """
     import shutil
 
     moved: List[str] = []
-    old_dir = legacy_settings_dir()
-    if not os.path.isdir(old_dir):
-        return moved
     new_dir = os.path.dirname(os.path.abspath(default_settings_path()))
     try:
-        if os.path.abspath(old_dir) == os.path.abspath(new_dir):
-            return moved
         if not os.path.isdir(new_dir):
             os.makedirs(new_dir)
     except OSError:
         return moved
 
-    for name in ("settings.json", "config.ini"):
-        source = os.path.join(old_dir, name)
-        target = os.path.join(new_dir, name)
-        if not os.path.isfile(source) or os.path.exists(target):
+    for old_dir in legacy_settings_dirs():
+        if not os.path.isdir(old_dir):
             continue
         try:
-            shutil.copy2(source, target)
-            moved.append(target)
+            if os.path.abspath(old_dir) == os.path.abspath(new_dir):
+                continue
         except OSError:
             continue
+        for name in ("settings.json", "config.ini"):
+            source = os.path.join(old_dir, name)
+            target = os.path.join(new_dir, name)
+            if not os.path.isfile(source) or os.path.exists(target):
+                continue
+            try:
+                shutil.copy2(source, target)
+                moved.append(target)
+            except OSError:
+                continue
     return moved
 
 
 def default_settings_path() -> str:
-    override = _env("SMART_FTP_SETTINGS", LEGACY_ENV_SETTINGS)
+    override = _env("BLUEBIRD_SETTINGS", *LEGACY_ENV_SETTINGS)
     if override:
         return override
     base = os.environ.get("APPDATA") or os.path.expanduser("~")
@@ -798,7 +809,7 @@ def default_settings_path() -> str:
 
 def default_config_path() -> str:
     """Where the saved connections live (``config.ini``)."""
-    override = _env("SMART_FTP_CONFIG", LEGACY_ENV_CONFIG)
+    override = _env("BLUEBIRD_CONFIG", *LEGACY_ENV_CONFIG)
     if override:
         return override
     return os.path.join(os.path.dirname(default_settings_path()), "config.ini")

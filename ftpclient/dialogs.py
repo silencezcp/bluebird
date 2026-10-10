@@ -694,7 +694,7 @@ class PreferencesDialog(_LocalisedButtons, QDialog):
                 if parent and not os.path.isdir(parent):
                     os.makedirs(parent)
                 with open(path, "w", encoding="utf-8") as handle:
-                    handle.write("; Smart FTP saved connections\n")
+                    handle.write("; BlueBird saved connections\n")
         except OSError as exc:
             QMessageBox.warning(self, T("Configuration files"),
                                 T("Could not open %s") % path)
