@@ -113,6 +113,22 @@ def main() -> int:
         print("  ! no icon could be rendered")
         return 1
 
+    # The user manual embeds a copy of the icon.  Refresh it here so the manual
+    # and the executable can never show different artwork - they were allowed
+    # to drift once, and the packaged manual ended up with the old drawing.
+    import shutil
+    manual_copy = os.path.join(ROOT, "docs", "screenshots", "21-app-icon.png")
+    source = os.path.join(PACKAGING, "bluebird.png")
+    if os.path.isfile(source):
+        try:
+            if not os.path.isdir(os.path.dirname(manual_copy)):
+                os.makedirs(os.path.dirname(manual_copy))
+            shutil.copyfile(source, manual_copy)
+            print("  refreshed %s (%d bytes)"
+                  % (manual_copy, os.path.getsize(manual_copy)))
+        except OSError as exc:
+            print("  ! could not refresh the manual's icon copy: %s" % exc)
+
     target = os.path.join(PACKAGING, "version_info.txt")
     payload = VERSION_INFO.format(
         appname=__appname__, author=__author__, email=__author_email__,

@@ -22,20 +22,30 @@ D:\DSH_Workspaces\Ftp\python.exe tools\make_icon.py
 
 ## 两种界面：图形 + 命令行
 
-同一套会话层（`ftpclient/core.py` + `session.py`）同时驱动 GUI 和 CLI，
-两边行为一致，不会各写一份。
+打包后有**两个 exe**，共用同一套会话层（`ftpclient/core.py` + `session.py`），
+所以两边行为一致，不会各写一份：
 
-**命令行**（**不需要 PyQt5**，可在无桌面环境运行；脚本里很好用）：
+| 文件 | 界面 | 用途 |
+|---|---|---|
+| `BlueBird.exe` | **图形** | 双击使用的窗口程序 |
+| `BlueBird-cli.exe` | **命令行** | 在命令提示符 / 批处理 / 计划任务里使用 |
+
+> **为什么要两个 exe**：Windows 不会给「窗口程序」分配控制台，所以
+> `BlueBird.exe ls ...` 会执行但**什么都不打印**。命令行功能因此单独做成
+> 控制台程序 `BlueBird-cli.exe`；它**不含 Qt**，体积小得多，也不需要桌面环境。
+
+**命令行用法**（`BlueBird-cli.exe` 换成 `bluebird.cmd` 或
+`python -m ftpclient.cli` 等价）：
 
 ```bat
-bluebird.cmd ls sftp://silence@192.168.31.142:22          :: 列目录
-bluebird.cmd ls -l --saved fa2oa                          :: 用已保存的连接
-bluebird.cmd get sftp://user@host -r /pub/a.bin -d C:\Temp
-bluebird.cmd put .\build.zip ftp://user@host -r /releases
-bluebird.cmd mirror sftp://user@host -r /var/www -d .\www --delete
-bluebird.cmd stat ftp://user@host -r /pub/report.pdf
-bluebird.cmd sites                                        :: 列出已保存连接
-bluebird.cmd --help
+BlueBird-cli.exe ls sftp://silence@192.168.31.142:22      :: 列目录
+BlueBird-cli.exe ls -l --saved fa2oa                      :: 用已保存的连接
+BlueBird-cli.exe get sftp://user@host -r /pub/a.bin -d C:\Temp
+BlueBird-cli.exe put .\build.zip ftp://user@host -r /releases
+BlueBird-cli.exe mirror sftp://user@host -r /var/www -d .\www --delete
+BlueBird-cli.exe stat ftp://user@host -r /pub/report.pdf
+BlueBird-cli.exe sites                                    :: 列出已保存连接
+BlueBird-cli.exe --help
 ```
 
 | 命令 | 作用 |
@@ -253,14 +263,21 @@ D:\DSH_Workspaces\Ftp\python.exe -m pip install -r requirements.txt ^
 
 ## 2.5 打包成 exe
 
-`dist\BlueBird\BlueBird.exe` 是免安装版（**约 282 MB**，不需要装 Python）。
+`dist\BlueBird\` 是免安装版（**约 282 MB**，不需要装 Python），里面有**两个程序**：
+
+| 文件 | 说明 |
+|---|---|
+| `BlueBird.exe` | 图形界面（窗口程序） |
+| `BlueBird-cli.exe` | 命令行界面（控制台程序，不含 Qt） |
+
 重新打包：
 
 ```bat
 build_exe.cmd
 ```
 
-它会依次：重建用户手册 → 调用 PyInstaller → 跑一次 `--selftest` 自检。
+它会依次：重新生成图标（含手册里那份副本）→ 重建用户手册 →
+调用 PyInstaller（一次产出两个 exe）→ 分别跑 `--selftest` 自检。
 
 单独打包：
 
@@ -271,16 +288,19 @@ D:\DSH_Workspaces\Ftp\python.exe -m PyInstaller --clean --noconfirm ^
 
 | 项目 | 说明 |
 |---|---|
-| 输出 | `dist\BlueBird\`（**ondir 模式**，不是单文件） |
+| 输出 | `dist\BlueBird\`（**on-dir 模式**，不是单文件） |
 | 为什么不用单文件 | 单文件每次启动都要把约 280 MB 解压到临时目录，很慢；on-dir 秒开 |
 | 手册位置 | `dist\BlueBird\docs\`（**和 exe 同级**，可直接替换成你自己的版本） |
-| 自检 | `BlueBird.exe --selftest` → 写 `bluebird-startup.log` |
+| 自检 | `BlueBird.exe --selftest` → 写 `bluebird-startup.log`；`BlueBird-cli.exe selftest` |
 | 版本号 | `BlueBird.exe --version` |
 | 体积构成 | `Qt5WebEngineCore.dll` 97 MB（内置手册渲染必须）、`opengl32sw.dll` 20 MB（无显卡驱动的机器需要）、Qt 其它库 |
 
+> `BlueBird-cli.exe` 是在 spec 里用**独立 Analysis** 构建的，显式排除了 PyQt5，
+> 所以它不依赖 Qt；两个 exe 共用同一个 `dist\BlueBird\` 目录里的运行库。
+
 **已验证**：`--selftest` 在打包后报告 `frozen: True`、手册 HTML/PDF 均能找到、
 QtWebEngine 可用、主窗口构建成功、**手册页面真实渲染完成**；GUI 启动常驻
-（约 102 MB 内存）。
+（约 102 MB 内存）；`BlueBird-cli.exe` 可正常输出并实测连接真实 SFTP 服务器。
 
 打包脚本已经剔除了用不到的东西（Qt 自带翻译文件 23 MB、Qt3D/Sensors/Location
 等 QML 模块），所以比原始收集结果小约 30 MB。
@@ -425,7 +445,7 @@ order = Production web server,Backup NAS
 ```
 Ftp Client/
 ├─ run.py                     启动入口（源码运行）
-├─ run.cmd / run_tests.cmd    免配置启动 / 测试
+├─ bluebird.cmd              命令行包装（源码方式）`r`n├─ bluebird.py               命令行入口（源码方式）`r`n├─ bluebird_cli.py           打包用命令行入口`r`n├─ run.cmd / run_tests.cmd    免配置启动 / 测试
 ├─ build_exe.cmd              重建手册 → PyInstaller 打包 → 自检
 ├─ requirements.txt
 ├─ packaging/
@@ -460,7 +480,7 @@ Ftp Client/
 │  ├─ 用户手册.html           自包含 HTML（截图已内嵌）
 │  ├─ 用户手册.pdf            A4 打印版
 │  └─ screenshots/
-└─ dist/BlueBird/             打包产物（BlueBird.exe + docs/ + Qt 运行时）
+└─ dist/BlueBird/             打包产物（BlueBird.exe + BlueBird-cli.exe + docs/ + 运行库）
 ```
 
 设计上有意把**网络层和界面层完全分开**：`session.py` 和 `transfer.py` 里没有

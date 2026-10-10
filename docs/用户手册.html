@@ -575,10 +575,26 @@ order = Production web server,Backup NAS</code></pre>
 <table><thead><tr><th>快捷键</th><th>功能</th></tr></thead><tbody><tr><td><code>F1</code></td><td>快捷键帮助</td></tr><tr><td><code>Ctrl+Q</code></td><td>退出</td></tr></tbody></table>
 <hr>
 <h2 id="12-命令行版本cli">12. 命令行版本（CLI）</h2>
-<p>除图形界面外，同一套程序还带一个<strong>命令行版本</strong>，适合写脚本、批量传输，或在</p>
-<p>没有桌面的机器上运行。它<strong>不需要 PyQt5</strong>。</p>
+<p>打包后的 <code>dist\BlueBird\</code> 里有<strong>两个 exe</strong>，分别对应两种界面：</p>
+<table><thead><tr><th>文件</th><th>界面</th><th>说明</th></tr></thead><tbody><tr><td><code>BlueBird.exe</code></td><td><strong>图形界面</strong></td><td>双击使用的窗口程序</td></tr><tr><td><code>BlueBird-cli.exe</code></td><td><strong>命令行</strong></td><td>在命令提示符里使用，<strong>本节的命令都用它</strong></td></tr></tbody></table>
+<blockquote>
+<p><strong>为什么要分成两个 exe？</strong> Windows 不会给「窗口程序」分配控制台，</p>
+<p>所以如果用 <code>BlueBird.exe ls ...</code>，命令确实会执行，但<strong>什么都不会打印出来</strong>。</p>
+<p>因此命令行功能单独做成一个控制台程序 <code>BlueBird-cli.exe</code>；</p>
+<p>它也不包含 Qt，体积比图形版小得多。</p>
+</blockquote>
 <h3 id="121-怎么运行">12.1 怎么运行</h3>
-<table><thead><tr><th>方式</th><th>命令</th></tr></thead><tbody><tr><td>批处理包装（推荐）</td><td><code>bluebird.cmd ls sftp://user@host:22</code></td></tr><tr><td>Python 包装脚本</td><td><code>python bluebird.py ls sftp://user@host:22</code></td></tr><tr><td>直接调用模块</td><td><code>python -m ftpclient.cli ls sftp://user@host:22</code></td></tr></tbody></table>
+<p>把 <code>dist\BlueBird</code> 加入 <code>PATH</code>，或者直接用完整路径：</p>
+<pre class="lang-bat"><code>:: 在 dist\BlueBird 目录里
+BlueBird-cli.exe ls sftp://user@host:22
+
+:: 或者用完整路径
+D:\path\to\dist\BlueBird\BlueBird-cli.exe ls sftp://user@host:22</code></pre>
+<p>也可以用源码目录里的包装脚本（等价，便于开发调试）：</p>
+<table><thead><tr><th>方式</th><th>命令</th></tr></thead><tbody><tr><td>打包的 exe（<strong>发布后用这个</strong>）</td><td><code>BlueBird-cli.exe ls sftp://user@host:22</code></td></tr></tbody></table>
+<p>| Python 包装脚本 | <code>python bluebird.py ls sftp://user@host:22</code> |</p>
+<p>| 直接调用模块 | <code>python -m ftpclient.cli ls sftp://user@host:22</code> |</p>
+<p>不写参数直接运行 <code>BlueBird-cli.exe</code> 会打印帮助与所有可用命令。</p>
 <blockquote>
 <p><code>python -m ftpclient</code>（<strong>不带</strong> <code>.cli</code>）依然是启动图形界面，两者互不影响。</p>
 </blockquote>
@@ -590,32 +606,49 @@ user@host                             只写用户和主机，协议默认 FTP
 --saved fa2oa                         直接用 config.ini 里保存的连接</code></pre>
 <p>密码建议用环境变量，避免留在命令历史里：</p>
 <pre class="lang-bat"><code>set BLUEBIRD_PASSWORD=你的密码
-bluebird.cmd ls sftp://silence@192.168.31.142:22</code></pre>
+BlueBird-cli.exe ls sftp://silence@192.168.31.142:22</code></pre>
 <p>不给密码时会<strong>交互式提示</strong>输入（不回显）。SFTP 也可用 <code>--key 私钥文件</code>。</p>
 <h3 id="123-命令一览">12.3 命令一览</h3>
 <table><thead><tr><th>命令</th><th>说明</th><th>常用参数</th></tr></thead><tbody><tr><td><code>ls</code></td><td>列远程目录</td><td><code>-l</code> 详情、<code>--json</code>、<code>--pattern "*.log"</code>、<code>-a</code> 含隐藏</td></tr><tr><td><code>stat</code></td><td>单个路径详情</td><td><code>-r 路径</code>、<code>--json</code></td></tr><tr><td><code>get</code></td><td>下载文件或整个目录</td><td><code>-r 路径</code>、<code>-d 本地</code>、<code>-f</code> 覆盖</td></tr><tr><td><code>put</code></td><td>上传文件或目录</td><td>本地路径（可多个）、<code>-r 目标目录</code>、<code>-f</code> 覆盖</td></tr><tr><td><code>mirror</code></td><td>远程目录树同步到本地</td><td><code>-r</code>、<code>-d</code>、<code>--delete</code>、<code>--pattern</code></td></tr><tr><td><code>tree</code></td><td>显示远程目录树</td><td><code>--max-depth N</code>、<code>-l</code></td></tr><tr><td><code>mkdir</code></td><td>建目录（<strong>自动建父级</strong>，已存在不报错）</td><td><code>-r 路径</code>（可用逗号分隔多个）</td></tr><tr><td><code>rm</code></td><td>删除</td><td><code>-r 路径</code>、<code>--recursive</code> 删目录</td></tr><tr><td><code>rename</code></td><td>改名 / 移动</td><td><code>-r 旧路径</code>、<code>--to 新路径</code></td></tr><tr><td><code>chmod</code></td><td>改权限</td><td><code>644</code>、<code>-r 路径</code></td></tr><tr><td><code>cat</code></td><td>打印远程文本文件</td><td><code>-r 路径</code></td></tr><tr><td><code>sites</code></td><td>列出已保存的连接</td><td><code>--json</code></td></tr><tr><td><code>selftest</code></td><td>打印版本与配置路径</td><td>—</td></tr></tbody></table>
 <h3 id="124-实用例子">12.4 实用例子</h3>
 <pre class="lang-bat"><code>:: 用已保存的连接看目录详情
-bluebird.cmd ls -l --saved fa2oa
+BlueBird-cli.exe ls -l --saved fa2oa
 
 :: 只挑日志下载
-bluebird.cmd ls sftp://user@host -r /var/log --pattern "*.log"
-bluebird.cmd get sftp://user@host -r /var/log/app.log -d D:\logs
+BlueBird-cli.exe ls sftp://user@host /var/log --pattern "*.log"
+BlueBird-cli.exe get sftp://user@host -r /var/log/app.log -d D:\logs
 
 :: 整个网站镜像到本地，并删掉服务器上已不存在的本地文件
-bluebird.cmd mirror sftp://user@host -r /var/www -d D:\backup\www --delete
+BlueBird-cli.exe mirror sftp://user@host -r /var/www -d D:\backup\www --delete
 
 :: 上传一个目录（远端目录结构会自动建好）
-bluebird.cmd put .\dist ftp://user@host -r /releases/1.0
+BlueBird-cli.exe put .\dist ftp://user@host -r /releases/1.0
 
 :: 机器可读输出，接给别的程序
-bluebird.cmd ls sftp://user@host --json &gt; listing.json</code></pre>
+BlueBird-cli.exe ls sftp://user@host --json &gt; listing.json</code></pre>
 <h3 id="125-行为约定">12.5 行为约定</h3>
-<table><thead><tr><th>约定</th><th>说明</th></tr></thead><tbody><tr><td><strong>退出码</strong></td><td><code>0</code> 成功、<code>1</code> 出错（连不上、路径不存在、部分条目失败）、<code>2</code> 用法错误</td></tr><tr><td><strong>默认不覆盖</strong></td><td><code>get</code>/<code>put</code> 遇到已存在文件会跳过并提示，要覆盖请加 <code>-f</code></td></tr><tr><td><strong>stdout / stderr 分离</strong></td><td>数据只走 stdout，进度与提示走 stderr，可安全管道</td></tr><tr><td><strong><code>mirror</code> 比较方式</strong></td><td>大小一致就跳过；<code>--force</code> 强制重下</td></tr><tr><td><strong>部分失败也算失败</strong></td><td>批次内只要有条目失败，退出码即为 1，脚本能感知</td></tr><tr><td><strong><code>-q / --quiet</code></strong></td><td>不打印进度与汇总</td></tr></tbody></table>
-<h3 id="126-排错">12.6 排错</h3>
-<pre class="lang-bat"><code>bluebird.cmd selftest</code></pre>
+<table><thead><tr><th>约定</th><th>说明</th></tr></thead><tbody><tr><td><strong>退出码</strong></td><td><code>0</code> 成功、<code>1</code> 出错（连不上、路径不存在、部分条目失败）、<code>2</code> 用法错误</td></tr><tr><td><strong>默认不覆盖</strong></td><td><code>get</code>/<code>put</code> 遇到已存在文件会跳过并提示，要覆盖请加 <code>-f</code></td></tr><tr><td><strong>stdout / stderr 分离</strong></td><td>数据只走 stdout，进度与提示走 stderr，可安全管道</td></tr><tr><td><strong><code>mirror</code> 比较方式</strong></td><td>大小一致就跳过；<code>--force</code> 强制重下</td></tr><tr><td><strong>部分失败也算失败</strong></td><td>批次内只要有条目失败，退出码即为 1，脚本能感知</td></tr><tr><td><strong><code>-q / --quiet</code></strong></td><td>不打印进度与汇总</td></tr><tr><td><strong>读取同一份配置</strong></td><td>与图形版共用 <code>config.ini</code> / <code>settings.json</code>，<code>--saved</code> 的名字就是图形版里存的连接</td></tr></tbody></table>
+<h3 id="126-脚本里怎么用">12.6 脚本里怎么用</h3>
+<pre class="lang-bat"><code>@echo off
+set BLUEBIRD_PASSWORD=你的密码
+set BB=D:\path\to\dist\BlueBird\BlueBird-cli.exe
+
+:: 备份网站；失败就退出并报错
+"%BB%" mirror sftp://user@host -r /var/www -d D:\backup\www --delete
+if errorlevel 1 (
+    echo 备份失败
+    exit /b 1
+)
+
+:: 按日期归档日志
+"%BB%" get sftp://user@host -r /var/log/app.log -d "D:\logs\app-%DATE%.log" -f</code></pre>
+<p>也可以把 <code>dist\BlueBird</code> 目录加进系统 <code>PATH</code>，之后直接写 <code>BlueBird-cli.exe ...</code>。</p>
+<h3 id="127-排错">12.7 排错</h3>
+<pre class="lang-bat"><code>BlueBird-cli.exe selftest</code></pre>
 <p>会打印 Python 版本、是否打包运行、<code>config.ini</code> 与 <code>settings.json</code> 的路径、</p>
 <p>paramiko / PyNaCl 是否可用，以及支持的命令列表 —— 排查环境问题从这里开始。</p>
+<p>如果<strong>完全没有输出</strong>，几乎一定是用了图形版 <code>BlueBird.exe</code>：它是窗口程序，</p>
+<p>Windows 不给它控制台。请改用 <code>BlueBird-cli.exe</code>。</p>
 <hr>
 <h2 id="13-文件位置与备份">13. 文件位置与备份</h2>
 <table><thead><tr><th>内容</th><th>路径</th><th>环境变量覆盖</th></tr></thead><tbody><tr><td>偏好设置与颜色</td><td><code>%APPDATA%\.bluebird\settings.json</code></td><td><code>BLUEBIRD_SETTINGS</code></td></tr><tr><td>保存的连接</td><td><code>%APPDATA%\.bluebird\config.ini</code></td><td><code>BLUEBIRD_CONFIG</code></td></tr></tbody></table>

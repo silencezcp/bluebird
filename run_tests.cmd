@@ -19,6 +19,11 @@ if exist "dist\BlueBird\BlueBird.exe" (
 ) else (
     echo dist\BlueBird\BlueBird.exe not built - run build_exe.cmd first
 )
+if exist "dist\BlueBird\BlueBird-cli.exe" (
+    dist\BlueBird\BlueBird-cli.exe selftest || goto :fail
+) else (
+    echo dist\BlueBird\BlueBird-cli.exe not built - run build_exe.cmd first
+)
 echo.
 echo All test suites passed.
 exit /b 0
