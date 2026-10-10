@@ -59,6 +59,9 @@ TOC_LABEL = "\u76ee\u5f55"
 #: prepended to every heading anchor so the two books cannot share one
 ANCHOR_PREFIX = "u-"
 
+#: marks a list item line so later steps can find it inside the output list
+CONTINUATION_MARK = "\x00li\x00"
+
 # ---------------------------------------------------------------------------
 # The rest of the module works on one book at a time; main() fills these in.
 # ---------------------------------------------------------------------------
@@ -140,14 +143,149 @@ def split_row(line: str) -> List[str]:
     return [cell.strip() for cell in row.split("|")]
 
 
+def _is_block_start(line: str) -> bool:
+    """True when a line begins a new block rather than continuing a paragraph."""
+    stripped = line.lstrip()
+    if not stripped:
+        return True
+    if stripped[0] in "#>|":
+        return True
+    if stripped.startswith("```"):
+        return True
+    if re.match(r"^[-*+]\s+\S", stripped):
+        return True
+    if re.match(r"^\d+[.)]\s+\S", stripped):
+        return True
+    if re.match(r"^(-{3,}|\*{3,}|_{3,})\s*$", stripped):
+        return True
+    if stripped.startswith(("![", "[!")):
+        return True
+    return False
+
+
+#: Box-drawing and block characters.  Consecutive lines made of these are an
+#: ASCII art diagram: their line breaks are meaningful, so they are never
+#: joined, even though they look like wrapped text.
+DIAGRAM_CHARS = "\u2500\u2502\u250c\u2510\u2514\u2518\u251c\u2524\u252c" \
+                "\u2534\u253c\u2550\u2551\u2554\u2557\u255a\u255d\u2560" \
+                "\u2563\u2566\u2569\u256c\u25a0\u25a1"
+
+
+def _looks_like_diagram(text: str) -> bool:
+    """True for a line that is part of an ASCII art frame."""
+    stripped = text.strip()
+    return bool(stripped) and any(char in DIAGRAM_CHARS for char in stripped)
+
+
+def _join_soft_wraps(markdown: str) -> str:
+    """Join lines that are wrapped for width, not meant as separate blocks.
+
+    Markdown wraps a paragraph, and the continuation lines of a list item, at
+    whatever column fits; a newline inside one is a space, not a break.  The
+    converter below is line oriented, so without this every wrapped line became
+    its own block: paragraphs were split mid sentence, and a numbered list whose
+    items have continuation lines came out as one separate ``<ol>`` per item,
+    which browsers then renumber from 1.
+
+    Two shapes are handled:
+
+    * plain wrapping, where the next line continues the sentence;
+    * a list item's continuation, which markdown indents and which may follow a
+      blank line - that one has to stay attached to its item.
+
+    A line ending in a backslash keeps its break, which is what the ASCII art
+    diagrams use.
+    """
+    out: "List[str]" = []
+    buffer = ""
+    blank_pending = False      # a blank line just went by
+
+    def flush() -> None:
+        nonlocal buffer
+        if buffer:
+            out.append(buffer)
+            buffer = ""
+
+    #: A markdown list is "loose" when its items are separated by blank lines,
+    #: and then the item's continuation is indented by four spaces.  Anything
+    #: indented less, or that starts a block of its own, is not a continuation.
+    LOOSE_INDENT = 4
+    LIST_ITEM = re.compile(r"^ {0,3}(?:\d+[.)]|[-*+])\s+\S")
+
+    def starts_list(text: str) -> bool:
+        return bool(LIST_ITEM.match(text))
+
+    def indented_continuation(text: str) -> bool:
+        """An indented line continuing the item above, not a block of its own."""
+        if not text[:1].isspace():
+            return False
+        stripped = text.lstrip()
+        if not stripped or stripped[0] in "|>#" or stripped.startswith("```"):
+            return False
+        if starts_list(stripped):
+            return False
+        return (len(text) - len(stripped)) >= LOOSE_INDENT
+
+    for line in markdown.splitlines():
+        stripped = line.strip()
+        if not stripped:
+            flush()
+            out.append("")
+            blank_pending = True
+            continue
+
+        # a continuation of the list item above, possibly after a blank line
+        if buffer and (indented_continuation(line)
+                       or (blank_pending and starts_list(buffer))):
+            buffer += stripped if (not buffer[-1].isascii()
+                                   or not stripped[:1].isascii()) else \
+                " " + stripped
+            blank_pending = False
+            continue
+
+        if stripped.endswith("\\"):
+            buffer += line.rstrip()[:-1]
+            flush()
+            blank_pending = False
+            continue
+        if not buffer:
+            # A list item is a block, but its indented continuations belong to
+            # it, so the item has to open the buffer rather than be emitted on
+            # its own - otherwise the item and its continuation end up as two
+            # separate lists, which is the renumbering bug.
+            out.append(line)
+            blank_pending = False
+            continue
+        # an ASCII art frame keeps its own line breaks
+        if _looks_like_diagram(buffer) and _looks_like_diagram(line):
+            flush()
+            out.append(line)
+            blank_pending = False
+            continue
+        if _is_block_start(line) and not starts_list(line):
+            flush()
+            out.append(line)
+            blank_pending = False
+            continue
+        joiner = "" if (not buffer[-1].isascii() or not stripped[:1].isascii()) \
+            else " "
+        buffer += joiner + stripped
+        blank_pending = False
+    flush()
+    return "\n".join(out)
+
+
 def convert(markdown: str) -> Tuple[str, List[Tuple[int, str, str]]]:
     """Return (html_body, [(level, text, anchor)])."""
-    lines = markdown.splitlines()
+    lines = _join_soft_wraps(markdown).splitlines()
     out: List[str] = []
     headings: List[Tuple[int, str, str]] = []
     used: Dict[str, int] = {}
     index = 0
     list_stack: List[str] = []
+    #: indentation of the marker that opened the innermost list, for deciding
+    #: whether an indented line continues that item
+    list_indent = 0
     in_quote = False
 
     def close_lists() -> None:
@@ -257,9 +395,28 @@ def convert(markdown: str) -> Tuple[str, List[Tuple[int, str, str]]]:
                 while len(list_stack) < depth:
                     out.append("<%s>" % kind)
                     list_stack.append(kind)
-            out.append("<li>%s</li>" % inline(match.group(3)))
+            out.append("<li>%s%s</li>" % (CONTINUATION_MARK,
+                                          inline(match.group(3))))
+            list_indent = indent
             index += 1
             continue
+
+        # ---- a list item's continuation -----------------------------
+        # Markdown indents the rest of an item under its marker, and that text
+        # belongs inside the same <li>.  Emitting it as a paragraph instead
+        # closes the list, and a browser then renumbers the following items
+        # from 1 - which is exactly what the known-limitations list did.
+        if list_stack and line[:1].isspace() and line.strip() \
+                and (len(line) - len(line.lstrip())) > list_indent:
+            stripped = line.strip()
+            if stripped[0] not in "|>#" and not re.match(
+                    r"^(\s*)([-*+]|\d+[.)])\s+\S", line) \
+                    and not stripped.startswith("```"):
+                out[-1] = out[-1].replace(
+                    "</li>", " " + inline(stripped) + "</li>")
+                index += 1
+                continue
+
         close_lists()
 
         # ---- blank / paragraph -------------------------------------
@@ -271,7 +428,8 @@ def convert(markdown: str) -> Tuple[str, List[Tuple[int, str, str]]]:
 
     close_lists()
     close_quote()
-    return "\n".join(out), headings
+    # the marker that let a continuation find its item is internal only
+    return ("\n".join(out).replace(CONTINUATION_MARK, ""), headings)
 
 
 # ---------------------------------------------------------------------------
@@ -885,6 +1043,41 @@ def build_html(markdown: str, standalone: bool = True,
 # PDF via QtWebEngine
 # ---------------------------------------------------------------------------
 
+#: The QtWebEngine page, kept alive between books.  Creating a second page
+#: before the first is fully destroyed upsets the profile: the print then fails
+#: with "printer reported failure" and Qt warns that the page is still around.
+_PDF_PAGE: Any = None
+
+
+def _reap(app: Any, rounds: int = 60) -> None:
+    """Let Qt deliver the pending deletions."""
+    for _ in range(rounds):
+        app.processEvents()
+
+
+def _destroy_page(app: Any, page: Any) -> None:
+    """Tear a page down and wait until Qt has actually released it.
+
+    The page sometimes tears itself down after a print, so a deleted C++ object
+    here is a normal outcome rather than an error: both mean "this page is gone
+    and the next one may be created".
+    """
+    try:
+        from PyQt5.QtCore import QCoreApplication, QEvent
+        from PyQt5 import sip
+    except ImportError:
+        return
+    if sip.isdeleted(page):
+        return
+    page.deleteLater()
+    for _ in range(120):
+        QCoreApplication.sendPostedEvents(None, QEvent.DeferredDelete)
+        app.processEvents()
+        if sip.isdeleted(page):
+            return
+    print("  ! the web page did not shut down cleanly")
+
+
 def write_pdf(page_html: str, target: str) -> bool:
     try:
         from PyQt5.QtCore import QEventLoop, QMarginsF, QTimer, QUrl
@@ -905,10 +1098,35 @@ def write_pdf(page_html: str, target: str) -> bool:
             print("    close it in your PDF viewer and run this again")
             return False
 
+    global _PDF_PAGE
     app = QApplication.instance() or QApplication(sys.argv[:1])
-    page = QWebEnginePage()
+    _reap(app)
+    # A fresh page per book, and the previous one is gone before this one is
+    # made; reusing a page across books is not reliable here.
+    if _PDF_PAGE is not None:
+        _destroy_page(app, _PDF_PAGE)
+        _PDF_PAGE = None
+    # Its own profile per page: the default one keeps the render process alive
+    # between books, and the second print then fails with "printer reported
+    # failure" while Qt complains that the page was never deleted.
+    try:
+        from PyQt5.QtWebEngineWidgets import QWebEngineProfile
+        profile = QWebEngineProfile(parent=app)
+        page = QWebEnginePage(profile, app)
+    except (ImportError, TypeError):
+        page = QWebEnginePage()
+    _PDF_PAGE = page
     state = {"ok": False, "printed": False, "why": ""}
     loop = QEventLoop()
+
+    def detach() -> None:
+        """Drop our handlers: the page is reused for the next book."""
+        for signal, slot in ((page.pdfPrintingFinished, finished),
+                             (page.loadFinished, loaded)):
+            try:
+                signal.disconnect(slot)
+            except TypeError:
+                pass
 
     def finished(path: str, success: bool) -> None:
         state["ok"] = bool(success)
@@ -918,12 +1136,14 @@ def write_pdf(page_html: str, target: str) -> bool:
         else:
             print("  ! PDF rendering failed (%s)"
                   % (state["why"] or "printer reported failure"))
+        detach()
         loop.quit()
 
     def loaded(success: bool) -> None:
         if not success:
             state["why"] = "page failed to load"
             print("  ! page failed to load")
+            detach()
             loop.quit()
             return
         # The data: fonts have to be decoded before printing, otherwise the
@@ -945,18 +1165,25 @@ def write_pdf(page_html: str, target: str) -> bool:
         print("  ! PDF rendering timed out")
         loop.quit()
 
+    def on_done(path: str, success: bool) -> None:
+        """Disconnect before quitting: the page outlives this call."""
+        try:
+            page.pdfPrintingFinished.disconnect(finished)
+            page.loadFinished.disconnect(loaded)
+        except TypeError:
+            pass
+        finished(path, success)
+
     page.pdfPrintingFinished.connect(finished)
     page.loadFinished.connect(loaded)
     page.setHtml(page_html, QUrl.fromLocalFile(DOCS + os.sep))
     QTimer.singleShot(240000, timed_out)
     loop.exec_()
 
-    # Let WebEngine tear the page down, otherwise it warns and can crash on
-    # exit now that the fonts are large data URLs.
-    page.deleteLater()
+    # Leave the page in a clean state for the next book rather than destroying
+    # it; Qt reuses the profile and the print keeps working.  Done by hand
+    # because loop.quit() can return while a signal is still being delivered.
     app.processEvents()
-    for _ in range(30):
-        app.processEvents()
     return state["ok"]
 
 
@@ -1016,22 +1243,56 @@ def build_book(book: "dict", font_cache: "dict") -> bool:
 
 
 def main() -> int:
-    """Build every book.  --only NAME builds a single one."""
-    only = ""
-    if "--only" in sys.argv:
-        index = sys.argv.index("--only")
-        if index + 1 < len(sys.argv):
-            only = sys.argv[index + 1]
+    """Build the books.
 
-    font_cache: "dict" = {}
+    ``--only NAME``    build a single book, in this process
+    ``--one NAME``     internal: build one book and exit, used by the parent
+    ``--jobs``         build each book in its own process (the default)
+
+    Each book gets its own process because QtWebEngine cannot survive a page
+    being destroyed and another created afterwards: the second print makes the
+    whole process die with an access violation.  A fresh interpreter per book
+    costs a second of startup and removes the problem entirely.
+    """
+    argv = sys.argv[1:]
+
+    def value_of(flag: str) -> str:
+        if flag in argv:
+            index = argv.index(flag)
+            if index + 1 < len(argv):
+                return argv[index + 1]
+        return ""
+
+    one = value_of("--one")
+    if one:
+        book = next((item for item in BOOKS if one in item["source"]), None)
+        if book is None:
+            print("unknown book: %s" % one)
+            return 1
+        return 0 if build_book(book, {}) else 1
+
+    only = value_of("--only")
+    wanted = [book for book in BOOKS
+              if not only or only in book["source"]]
+    if not wanted:
+        print("no book matches %r" % only)
+        return 1
+
+    import subprocess
+
     built = []
-    for book in BOOKS:
-        if only and only not in book["source"]:
-            continue
-        if built:
+    for number, book in enumerate(wanted):
+        if number:
             print()
-        if build_book(book, font_cache):
+        result = subprocess.run(
+            [sys.executable, os.path.abspath(__file__), "--one",
+             book["source"]],
+            cwd=ROOT)
+        if result.returncode == 0:
             built.append(book["source"])
+        else:
+            print("  ! %s failed (exit %d)"
+                  % (book["source"], result.returncode))
 
     print()
     print("built: %s" % (", ".join(built) if built else "nothing"))
