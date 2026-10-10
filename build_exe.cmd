@@ -2,8 +2,8 @@
 rem ---------------------------------------------------------------------------
 rem  Build dist\BlueBird\ with the bundled Python 3.8.
 rem
-rem  Produces dist\BlueBird\BlueBird.exe plus docs\ (the user manual)
-rem  and the Qt runtime.
+rem  Produces dist\BlueBird\BlueBird.exe plus docs\ and the Qt runtime.
+rem  docs\ carries the user manual only; the developer manual stays here.
 rem ---------------------------------------------------------------------------
 setlocal
 set "PY=D:\DSH_Workspaces\Ftp\python.exe"
@@ -11,11 +11,12 @@ if not exist "%PY%" set "PY=python"
 cd /d "%~dp0"
 
 echo === regenerating the icon and version resource ===
-rem this also refreshes the copy the manual embeds, so the two cannot differ
+rem this also refreshes the copy the manuals embed, so the two cannot differ
 "%PY%" tools\make_icon.py || goto :fail
 
 echo.
-echo === rebuilding the user manual with the new icon ===
+echo === rebuilding the manuals (user + developer) ===
+rem only the user manual is copied into dist\ by the spec
 "%PY%" tools\build_manual.py || goto :fail
 
 echo.

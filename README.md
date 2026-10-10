@@ -235,17 +235,35 @@ D:\DSH_Workspaces\Ftp\python.exe -m PyInstaller --clean --noconfirm ^
 QtWebEngine 可用、主窗口构建成功、**手册页面真实渲染完成**；GUI 启动常驻
 （约 102 MB 内存）。
 
-### 用户手册的体积与目录跳转
+### 两本手册：用户手册 与 开发手册
+
+| 手册 | 读者 | 内容 | 是否随 exe 打包 |
+|---|---|---|---|
+| **用户手册** | 使用者 | 界面、连接、传输、颜色自定义、偏好、快捷键、排错 | ✅ **打包**（`dist\BlueBird\docs\`） |
+| **开发手册** | 开发者 | 源码结构、依赖安装、打包、测试、项目布局 | ❌ 只留在仓库里 |
+
+两者都由 `tools/build_manual.py` 从同名 `.md` 生成 HTML + PDF：
+
+```bat
+D:\DSH_Workspaces\Ftp\python.exe tools\build_manual.py              :: 两本都建
+D:\DSH_Workspaces\Ftp\python.exe tools\build_manual.py --only 开发手册  :: 只建一本
+```
+
+> **用户手册里没有**：Python / PyQt5 版本要求、`pip install`、源码目录结构、
+> `run.cmd`、项目布局。使用者拿到的是免安装的 `BlueBird.exe`，
+> 这些内容对他没有意义，全部只在开发手册里。
 
 | 产物 | 体积 | 目录跳转 |
 |---|---|---|
 | `docs\用户手册.html` | **约 1.3 MB** | ✅ 点击目录即可跳转（自包含，字体与截图全部内嵌） |
-| `docs\用户手册.pdf` | **约 5.1 MB** | ✅ 目录条目可点击 + **PDF 书签大纲**（63 条） |
+| `docs\用户手册.pdf` | **约 5.2 MB** | ✅ 目录条目可点击 + **PDF 书签大纲**（63 条） |
+| `docs\开发手册.html` | **约 1.3 MB** | ✅ 同上 |
+| `docs\开发手册.pdf` | **约 5.2 MB** | ✅ 同上 |
 
-> **PDF 从 37 MB 压到 5.1 MB**，靠三件事（都在 `tools/build_manual.py` 里）：
+> **PDF 从 37 MB 压到 5.2 MB**，靠三件事（都在 `tools/build_manual.py` 里）：
 > 1. **字体子集化** —— QtWebEngine 打印 PDF 时不裁剪字体，会把整个
 >    `Microsoft YaHei UI`（19 MB）塞进去，**而且塞两份**（常规 + 粗体）。
->    现在用 `fontTools` 按手册实际用到的 837 个字符裁剪成 WOFF2，
+>    现在用 `fontTools` 按手册实际用到的字符裁剪成 WOFF2，
 >    四个字体合计仅约 510 KB（37 MB → 15.5 MB）
 > 2. **消除字体回退** —— 页面上任何一个系统字体画不出的字符，WebEngine 都会
 >    回退到系统字体，并把**整个字体文件**嵌入（Cambria Math 一个就 9.3 MB）。
@@ -430,11 +448,15 @@ Ftp Client/
 │  ├─ test_ui_smoke.py        界面无头冒烟测试（317 项）
 ├─ tools/
 │  ├─ screenshot.py           生成文档截图
-│  └─ build_manual.py         由 Markdown 生成用户手册 HTML / PDF
+│  ├─ build_manual.py         由 Markdown 生成两本手册的 HTML / PDF
+│  └─ check_manual.py         检查手册的体积与目录跳转
 ├─ docs/
-│  ├─ 用户手册.md             用户手册源文件
+│  ├─ 用户手册.md             用户手册源文件（随 exe 打包）
 │  ├─ 用户手册.html           自包含 HTML（截图已内嵌）
-│  ├─ 用户手册.pdf            A4 打印版
+│  ├─ 用户手册.pdf            A4 打印版（目录可点击 + 书签）
+│  ├─ 开发手册.md             开发手册源文件（不打包）
+│  ├─ 开发手册.html
+│  ├─ 开发手册.pdf
 │  └─ screenshots/
 └─ dist/BlueBird/             打包产物（BlueBird.exe + docs/ + 运行库）
 ```

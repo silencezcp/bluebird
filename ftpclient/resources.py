@@ -47,13 +47,14 @@ def find_resource(*parts: str, required: bool = True) -> Optional[str]:
     return None if required else None
 
 
-#: the documentation shipped with the application
+#: The documentation shipped with the application.  Only the user manual is
+#: bundled; docs/开发手册.* stays in the repository, since it covers the source
+#: tree, the dependencies and the build.
 MANUAL_HTML = ("docs", "\u7528\u6237\u624b\u518c.html")
 MANUAL_MD = ("docs", "\u7528\u6237\u624b\u518c.md")
 MANUAL_PDF = ("docs", "\u7528\u6237\u624b\u518c.pdf")
-README = ("README.md",)
 
 __all__ = [
     "is_frozen", "resource_root", "resource_path", "find_resource",
-    "MANUAL_HTML", "MANUAL_MD", "MANUAL_PDF", "README",
+    "MANUAL_HTML", "MANUAL_MD", "MANUAL_PDF",
 ]

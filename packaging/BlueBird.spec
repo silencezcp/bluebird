@@ -33,23 +33,25 @@ for _required in ("bluebird.ico", "version_info.txt"):
 
 # ---------------------------------------------------------------------------
 # data files that are visible next to the executable
+#
+# Only the **user** manual ships.  docs/开发手册.* covers the source tree,
+# dependency installation and the build, so it stays in the repository; copying
+# it into the distribution would hand an end user documents they cannot use.
 # ---------------------------------------------------------------------------
+USER_MANUAL = "\u7528\u6237\u624b\u518c"      # 用户手册, the book shipped here
 datas = []
 
-for name in ("\u7528\u6237\u624b\u518c.html", "\u7528\u6237\u624b\u518c.md",
-             "\u7528\u6237\u624b\u518c.pdf"):
+for name in (USER_MANUAL + ".html", USER_MANUAL + ".md", USER_MANUAL + ".pdf"):
     path = os.path.join(DOCS, name)
     if os.path.isfile(path):
         datas.append((path, "docs"))
+    else:
+        print("BlueBird build: WARNING %s is missing - run the manual build, "
+              "otherwise it cannot be opened from the Help menu" % name)
 
 shots = os.path.join(DOCS, "screenshots")
 if os.path.isdir(shots):
     datas.append((shots, "docs/screenshots"))
-
-for name in ("README.md", "requirements.txt"):
-    path = os.path.join(ROOT, name)
-    if os.path.isfile(path):
-        datas.append((path, "."))
 
 # ---------------------------------------------------------------------------
 # modules the static analysis cannot always see

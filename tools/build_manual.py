@@ -21,10 +21,6 @@ from typing import Any, Dict, List, Optional, Tuple
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DOCS = os.path.join(ROOT, "docs")
-SOURCE = os.path.join(DOCS, "\u7528\u6237\u624b\u518c.md")
-HTML_OUT = os.path.join(DOCS, "\u7528\u6237\u624b\u518c.html")
-PDF_OUT = os.path.join(DOCS, "\u7528\u6237\u624b\u518c.pdf")
-TITLE = "\u9752\u9e1f BlueBird \u7528\u6237\u624b\u518c"
 
 #: pull the version and author straight from the package so the banner can
 #: never drift from the code
@@ -34,13 +30,59 @@ try:
 except Exception:                                # pragma: no cover
     __author__, _VERSION = "silence", "1.0.0"
 
-SUBTITLE = ("\u7248\u672c %s \u00b7 \u4f5c\u8005\uff1a%s \u00b7 "
-            "Python 3.8.3 + PyQt5 5.15.11 \u00b7 "
-            "FTP / FTPS / SFTP \u5ba2\u6237\u7aef" % (_VERSION, __author__))
-FOOTER = ("BlueBird %s \u00b7 \u7528\u6237\u624b\u518c \u00b7 \u4f5c\u8005\uff1a%s"
-          " \u00b7 \u7531 docs/\u7528\u6237\u624b\u518c.md \u81ea\u52a8\u751f\u6210"
-          % (_VERSION, __author__))
+#: The two books.  The user manual is the one that ships inside the
+#: executable's docs/ folder; the developer manual never leaves the repository.
+#: ``prefix`` keeps the heading anchors distinct, since both books have
+#: chapters with the same titles.
+BOOKS = (
+    {
+        "source": "\u7528\u6237\u624b\u518c.md",
+        "title": "\u9752\u9e1f BlueBird \u7528\u6237\u624b\u518c",
+        "subtitle": "\u7248\u672c %s \u00b7 \u4f5c\u8005\uff1a%s \u00b7 "
+                    "\u9002\u7528\u4e8e\u6253\u5305\u7248 BlueBird.exe \u00b7 "
+                    "Windows",
+        "footer": "\u7528\u6237\u624b\u518c",
+        "prefix": "u-",
+    },
+    {
+        "source": "\u5f00\u53d1\u624b\u518c.md",
+        "title": "\u9752\u9e1f BlueBird \u5f00\u53d1\u624b\u518c",
+        "subtitle": "\u7248\u672c %s \u00b7 \u4f5c\u8005\uff1a%s \u00b7 "
+                    "Python 3.8.3 + PyQt5 5.15.11 \u00b7 Windows",
+        "footer": "\u5f00\u53d1\u624b\u518c",
+        "prefix": "d-",
+    },
+)
+
 TOC_LABEL = "\u76ee\u5f55"
+
+#: prepended to every heading anchor so the two books cannot share one
+ANCHOR_PREFIX = "u-"
+
+# ---------------------------------------------------------------------------
+# The rest of the module works on one book at a time; main() fills these in.
+# ---------------------------------------------------------------------------
+SOURCE = os.path.join(DOCS, BOOKS[0]["source"])
+HTML_OUT = os.path.join(DOCS, "\u7528\u6237\u624b\u518c.html")
+PDF_OUT = os.path.join(DOCS, "\u7528\u6237\u624b\u518c.pdf")
+TITLE = BOOKS[0]["title"]
+SUBTITLE = BOOKS[0]["subtitle"] % (_VERSION, __author__)
+FOOTER = ("BlueBird %s \u00b7 %s \u00b7 \u4f5c\u8005\uff1a%s"
+          % (_VERSION, BOOKS[0]["footer"], __author__))
+
+
+def select_book(book: "dict") -> None:
+    """Point the module level paths at one book."""
+    global SOURCE, HTML_OUT, PDF_OUT, TITLE, SUBTITLE, FOOTER, ANCHOR_PREFIX
+    SOURCE = os.path.join(DOCS, book["source"])
+    stem = os.path.splitext(book["source"])[0]
+    HTML_OUT = os.path.join(DOCS, stem + ".html")
+    PDF_OUT = os.path.join(DOCS, stem + ".pdf")
+    TITLE = book["title"]
+    SUBTITLE = book["subtitle"] % (_VERSION, __author__)
+    FOOTER = ("BlueBird %s \u00b7 %s \u00b7 \u4f5c\u8005\uff1a%s"
+              % (_VERSION, book["footer"], __author__))
+    ANCHOR_PREFIX = book["prefix"]
 
 # ---------------------------------------------------------------------------
 # Markdown -> HTML (the subset this manual uses)
@@ -187,7 +229,9 @@ def convert(markdown: str) -> Tuple[str, List[Tuple[int, str, str]]]:
             close_lists()
             level = len(heading.group(1))
             text = heading.group(2).strip()
-            anchor = slugify(text)
+            # the prefix keeps anchors distinct between the two books, which
+            # share chapter titles; within a page it changes nothing
+            anchor = ANCHOR_PREFIX + slugify(text)
             if anchor in used:
                 used[anchor] += 1
                 anchor = "%s-%d" % (anchor, used[anchor])
@@ -851,6 +895,16 @@ def write_pdf(page_html: str, target: str) -> bool:
         print("  ! QtWebEngine unavailable (%s); skipping PDF" % exc)
         return False
 
+    # A PDF left open in a viewer makes the printer fail with no useful reason,
+    # and a stale file left behind would be mistaken for a fresh one.
+    if os.path.isfile(target):
+        try:
+            os.remove(target)
+        except OSError as exc:
+            print("  ! cannot replace %s: %s" % (target, exc))
+            print("    close it in your PDF viewer and run this again")
+            return False
+
     app = QApplication.instance() or QApplication(sys.argv[:1])
     page = QWebEnginePage()
     state = {"ok": False, "printed": False, "why": ""}
@@ -906,10 +960,12 @@ def write_pdf(page_html: str, target: str) -> bool:
     return state["ok"]
 
 
-def main() -> int:
+def build_book(book: "dict", font_cache: "dict") -> bool:
+    """Render one book to HTML and PDF.  Returns True when both were written."""
+    select_book(book)
     if not os.path.isfile(SOURCE):
         print("missing %s" % SOURCE)
-        return 1
+        return False
 
     with io.open(SOURCE, "r", encoding="utf-8") as handle:
         markdown = handle.read()
@@ -925,7 +981,11 @@ def main() -> int:
     _body, headings = convert(markdown)
 
     first_pass = build_html(markdown, compress_images=True)
-    font_css = build_font_face_css(first_pass)
+    if "css" in font_cache:
+        font_css = font_cache["css"]           # both books use the same fonts
+    else:
+        font_css = build_font_face_css(first_pass)
+        font_cache["css"] = font_css
     page = build_html(markdown, compress_images=True, font_css=font_css) \
         if font_css else first_pass
 
@@ -935,12 +995,13 @@ def main() -> int:
     except (IOError, OSError) as exc:
         print("  ! cannot write %s: %s" % (HTML_OUT, exc))
         print("    (a viewer such as Word or a browser may still hold it open)")
-        return 1
+        return False
     print("  wrote %s (%.2f MB)" % (HTML_OUT,
                                     os.path.getsize(HTML_OUT) / 1048576.0))
 
-    print("rendering PDF...")
-    if write_pdf(page, PDF_OUT):
+    print("  rendering PDF...")
+    ok = write_pdf(page, PDF_OUT)
+    if ok:
         add_pdf_navigation(PDF_OUT, headings)
 
     if os.path.isfile(PDF_OUT):
@@ -951,7 +1012,30 @@ def main() -> int:
                   "file per family unless it is subset first: check that "
                   "fontTools is installed (pip install fonttools) and that "
                   "C:/Windows/Fonts has msyh.ttc.")
-    return 0
+    return ok
+
+
+def main() -> int:
+    """Build every book.  --only NAME builds a single one."""
+    only = ""
+    if "--only" in sys.argv:
+        index = sys.argv.index("--only")
+        if index + 1 < len(sys.argv):
+            only = sys.argv[index + 1]
+
+    font_cache: "dict" = {}
+    built = []
+    for book in BOOKS:
+        if only and only not in book["source"]:
+            continue
+        if built:
+            print()
+        if build_book(book, font_cache):
+            built.append(book["source"])
+
+    print()
+    print("built: %s" % (", ".join(built) if built else "nothing"))
+    return 0 if built else 1
 
 
 if __name__ == "__main__":
