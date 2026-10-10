@@ -96,7 +96,7 @@ class PathBar(QFrame):
         self.edit.installEventFilter(self)
         layout.addWidget(self.edit, 1)
 
-        self.recent_button = self._tool("bookmark", "Recent locations",
+        self.recent_button = self._tool("history", "Recent locations",
                                         self._show_recent)
         self.refresh_button = self._tool("refresh", "Refresh (F5)", self.refresh.emit)
         layout.addWidget(self.recent_button)

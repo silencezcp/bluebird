@@ -359,6 +359,14 @@ ACTION_TEMPLATES: Dict[str, str] = {
       fill-opacity="0.18" stroke="{{accent}}" stroke-width="1.6"
       stroke-linejoin="round"/>
 """,
+    "history": """
+<path d="M4.6 9.1A8 8 0 1 1 4 13.6" fill="none" stroke="{{text_muted}}"
+      stroke-width="1.7" stroke-linecap="round"/>
+<path d="M2.2 6.2v3.6h3.6" fill="none" stroke="{{text_muted}}"
+      stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M12 7.9V12l3.1 1.9" fill="none" stroke="{{text_muted}}"
+      stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+""",
     "bookmark_off": """
 <path d="M6.4 4.4h11.2v15.2L12 15.6l-5.6 4z" fill="none" stroke="{{text_muted}}"
       stroke-width="1.6" stroke-linejoin="round"/>

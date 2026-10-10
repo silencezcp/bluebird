@@ -52,7 +52,9 @@ def main():
     if not os.path.isdir(outdir):
         os.makedirs(outdir)
 
-    workdir = tempfile.mkdtemp(prefix="smart-shot-")
+    # the folder name is visible in the screenshots, so it carries the current
+    # product name rather than an earlier one
+    workdir = tempfile.mkdtemp(prefix="bluebird-shot-")
     settings_path = os.path.join(workdir, "settings.json")
     os.environ["BLUEBIRD_SETTINGS"] = settings_path
 

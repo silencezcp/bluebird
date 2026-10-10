@@ -529,7 +529,7 @@ class MainWindow(QMainWindow):
             pane.path_bar.up_button.setIcon(self.icons.action_icon("up", size=18))
             pane.path_bar.home_button.setIcon(self.icons.action_icon("home", size=18))
             pane.path_bar.refresh_button.setIcon(self.icons.action_icon("refresh", size=18))
-            pane.path_bar.recent_button.setIcon(self.icons.action_icon("bookmark", size=18))
+            pane.path_bar.recent_button.setIcon(self.icons.action_icon("history", size=18))
             pane.header.hidden_button.setIcon(self.icons.action_icon(
                 "eye" if pane.header.hidden_button.isChecked() else "eye_off",
                 size=17))
