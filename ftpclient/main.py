@@ -336,7 +336,7 @@ class MainWindow(QMainWindow):
     # construction
     # ------------------------------------------------------------------
     def _window_icon(self) -> QIcon:
-        """The application icon: a cloud over a three-node network."""
+        """The application icon: the blue bird carrying a letter."""
         try:
             from . import appicon
             return appicon.icon()

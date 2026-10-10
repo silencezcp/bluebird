@@ -23,10 +23,10 @@ import sys
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
-# NOTE: the icon contains the text "FTP", and text needs fonts.  The offscreen
-# platform plugin ships none (QFontDatabase is empty), which silently produces
-# a wordless cloud - so the real platform is used and offscreen is only a last
-# resort for headless machines.
+# NOTE: the offline platform plugin ships no fonts at all (QFontDatabase is
+# empty).  The bird does not draw text, so it renders correctly either way,
+# but the real platform is still preferred: it is what the finished icon is
+# actually seen through, and offscreen stays a fallback for headless machines.
 if not os.environ.get("QT_QPA_PLATFORM"):
     os.environ["QT_QPA_PLATFORM"] = "windows"
 
@@ -103,8 +103,11 @@ def main() -> int:
     families = len(QFontDatabase().families())
     print("  platform: %s | font families: %d" % (app.platformName(), families))
     if not families:
-        print("  ! WARNING: no fonts available, the icon will be missing the")
-        print("    \"FTP\" lettering.  Run this on a normal desktop session.")
+        # the icon draws no text, so a fontless platform still produces the
+        # right picture; only the manual's typography would suffer
+        print("  ! WARNING: no fonts are available.  The bird draws no text, so")
+        print("    the icon is unaffected; run this on a normal desktop session")
+        print("    if you also want the manual to render properly.")
 
     written = appicon.write_assets(PACKAGING)
     for path in written:

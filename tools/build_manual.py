@@ -312,9 +312,9 @@ img {
 }
 .doc-header h1 { color: #FFFFFF; margin: 0 0 6px 0; }
 .doc-header .meta { color: #D8E6F2; font-size: 13.5px; }
-/* the application icon in the banner.  It is a light-blue cloud, so it needs
-   a light backing to be visible against the blue gradient.  The box is
-   border-box so the padding does not squeeze the image. */
+/* the application icon in the banner: the blue bird carrying a letter.  It is
+   mostly light blue, so it needs a white backing to stand out against the blue
+   gradient.  The box is border-box so the padding does not squeeze it. */
 p.doc-mark {
   margin: 2px 0 0 0; padding: 9px; background: #FFFFFF;
   border: none; border-radius: 22px;
