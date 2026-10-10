@@ -11,3 +11,5 @@ nacreftp-startup.log
 .smoketest/
 COMMIT_MSG.txt
 .idea/
+.t*.txt
+COMMIT.txt

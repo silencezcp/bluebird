@@ -59,6 +59,12 @@ def build_application(argv: Optional[List[str]] = None) -> QApplication:
     app.setApplicationVersion(__version__)
     app.setOrganizationName(__orgname__)
     app.setStyle("Fusion")
+    # the window/taskbar icon is drawn at runtime, so no asset has to ship
+    try:
+        from . import appicon
+        app.setWindowIcon(appicon.icon())
+    except Exception:
+        pass
     _install_excepthook(app)
     return app
 

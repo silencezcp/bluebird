@@ -25,10 +25,21 @@ SOURCE = os.path.join(DOCS, "\u7528\u6237\u624b\u518c.md")
 HTML_OUT = os.path.join(DOCS, "\u7528\u6237\u624b\u518c.html")
 PDF_OUT = os.path.join(DOCS, "\u7528\u6237\u624b\u518c.pdf")
 TITLE = "Nacre FTP \u7528\u6237\u624b\u518c"
-SUBTITLE = ("\u7248\u672c 1.0.0 \u00b7 Python 3.8.3 + PyQt5 5.15.11 \u00b7 "
-            "FTP / FTPS / SFTP \u5ba2\u6237\u7aef")
-FOOTER = ("Nacre FTP 1.0.0 \u00b7 \u7528\u6237\u624b\u518c \u00b7 "
-          "\u7531 docs/\u7528\u6237\u624b\u518c.md \u81ea\u52a8\u751f\u6210")
+
+#: pull the version and author straight from the package so the banner can
+#: never drift from the code
+try:
+    sys.path.insert(0, ROOT)
+    from ftpclient import __author__, __version__ as _VERSION
+except Exception:                                # pragma: no cover
+    __author__, _VERSION = "silence", "1.0.0"
+
+SUBTITLE = ("\u7248\u672c %s \u00b7 \u4f5c\u8005\uff1a%s \u00b7 "
+            "Python 3.8.3 + PyQt5 5.15.11 \u00b7 "
+            "FTP / FTPS / SFTP \u5ba2\u6237\u7aef" % (_VERSION, __author__))
+FOOTER = ("Nacre FTP %s \u00b7 \u7528\u6237\u624b\u518c \u00b7 \u4f5c\u8005\uff1a%s"
+          " \u00b7 \u7531 docs/\u7528\u6237\u624b\u518c.md \u81ea\u52a8\u751f\u6210"
+          % (_VERSION, __author__))
 TOC_LABEL = "\u76ee\u5f55"
 
 # ---------------------------------------------------------------------------

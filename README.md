@@ -1,8 +1,29 @@
 # Nacre FTP — 现代奶白色 FTP / FTPS / SFTP 客户端
 
+**作者：silence** ｜ 版本 1.0.0
+
 基于 **Python 3.8.3 + PyQt5 5.15.11 + PyQtWebEngine 5.15.7 + paramiko** 实现的
 FTP/SFTP 双栏客户端，界面参考 **FileZilla Client** 的信息架构，但换成现代奶白色
 （milk-white / cream）视觉风格。
+
+<img src="docs/screenshots/21-app-icon.png" width="128" alt="应用图标">
+
+应用图标是**代码画出来的**（`ftpclient/appicon.py`，用 QPainter 绘制一朵云 +
+FTP 字样 + 三个绿色节点），所以任何尺寸都清晰、也不会随附二进制素材：
+
+```bat
+:: 重新生成 packaging\nacreftp.ico（7 种尺寸）与 version_info.txt（含作者）
+D:\DSH_Workspaces\Ftp\python.exe tools\make_icon.py
+```
+
+exe 的版本资源里也写入了作者：
+
+| 字段 | 值 |
+|---|---|
+| CompanyName | silence |
+| FileDescription | Nacre FTP - FTP / FTPS / SFTP client |
+| LegalCopyright | Copyright (c) 2026 silence |
+| Comments | Author: silence <2446522180@qq.com> |
 
 * **文件夹默认蓝色**，**文件默认跟随正文颜色**（深灰棕），两者都可以在
   偏好设置里自由修改，并且内置了「冲突检测」，两者太接近时会给出警告。

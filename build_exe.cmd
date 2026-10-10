@@ -12,6 +12,10 @@ echo === rebuilding the user manual ===
 "%PY%" tools\build_manual.py || goto :fail
 
 echo.
+echo === regenerating the icon and version resource ===
+"%PY%" tools\make_icon.py || goto :fail
+
+echo.
 echo === packaging with PyInstaller ===
 "%PY%" -m PyInstaller --clean --noconfirm packaging\NacreFTP.spec || goto :fail
 

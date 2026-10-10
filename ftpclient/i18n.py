@@ -500,6 +500,8 @@ ZH: Dict[str, str] = {
     "Overwriting without asking for the rest of this batch":
         "本批次剩余文件将直接覆盖，不再询问",
     "Time": "时间",
+    "About %s": "关于 %s",
+    "Author: %s": "作者：%s",
     "Configuration files": "配置文件",
     "Open the configuration folder": "打开配置文件夹",
     "Edit the saved connections (config.ini)": "编辑已保存的连接（config.ini）",

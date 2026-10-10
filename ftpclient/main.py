@@ -18,7 +18,7 @@ from PyQt5.QtWidgets import (QAbstractItemView, QAction, QApplication,
                              QTableView, QToolBar, QToolButton, QVBoxLayout,
                              QWidget)
 
-from . import __appname__, __version__
+from . import __appname__, __author__, __version__
 from . import config as _config
 from . import session as _session
 from .dialogs import ConnectDialog, PreferencesDialog, SiteManagerDialog
@@ -326,12 +326,18 @@ class MainWindow(QMainWindow):
     # construction
     # ------------------------------------------------------------------
     def _window_icon(self) -> QIcon:
-        icon = QIcon()
-        for size in (16, 24, 32, 48, 64):
-            icon.addPixmap(self.icons.file_icon(
-                "folder", self.theme.color("folder"), "folder", size=size).pixmap(
-                    size, size))
-        return icon
+        """The application icon: a cloud over a three-node network."""
+        try:
+            from . import appicon
+            return appicon.icon()
+        except Exception:
+            # never let the icon stop the window from opening
+            icon = QIcon()
+            for size in (16, 24, 32, 48, 64):
+                icon.addPixmap(self.icons.file_icon(
+                    "folder", self.theme.color("folder"), "folder",
+                    size=size).pixmap(size, size))
+            return icon
 
     def _build_ui(self) -> None:
         central = QWidget(self)
@@ -1742,17 +1748,19 @@ class MainWindow(QMainWindow):
             QMessageBox.information(self, "Documentation",
                                     T("Could not open %s") % folder)
 
-    def show_about(self) -> None:        QMessageBox.about(
-            self, "About %s" % __appname__,
+    def show_about(self) -> None:
+        QMessageBox.about(
+            self, T("About %s") % __appname__,
             "<h3>%s %s</h3>"
             "<p>%s</p>"
             "<p>%s</p>"
-            "<p style='color:#8A8072'>Python %s</p>"
+            "<p style='color:#8A8072'>%s<br>Python %s</p>"
             % (__appname__, __version__,
                T("A cream-themed FTP / FTPS / SFTP client built with PyQt5, "
                  "PyQtWebEngine and paramiko."),
                T("Every colour is yours to change: open "
                  "View \u2014 Preferences \u2014 Colours."),
+               T("Author: %s") % __author__,
                sys.version.split()[0]))
 
     # ------------------------------------------------------------------
