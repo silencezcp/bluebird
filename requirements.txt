@@ -17,57 +17,140 @@
 # RUNTIME - required to run the client
 # -------------------------------------------------------------------------
 #   bcrypt               reads passphrase-protected OpenSSH private keys
+#                        licence: Apache-2.0
 bcrypt==5.0.0
 #   cffi                 C bindings used by cryptography and PyNaCl
+#                        licence: MIT
 cffi==1.17.1
 #   cryptography         low level crypto (AES / RSA / ECDSA / TLS); FTPS too
+#                        licence: Apache-2.0 OR BSD-3-Clause
 cryptography==47.0.0
 #   paramiko             the SFTP (SSH) implementation
+#                        licence: LGPL-2.1-or-later
 paramiko==3.5.1
 #   pycparser            C parser used by cffi
+#                        licence: BSD-3-Clause
 pycparser==2.23
 #   PyNaCl               Ed25519 signing - paramiko imports it unconditionally, so without it every ssh-ed25519 key stops working
+#                        licence: Apache-2.0
 PyNaCl==1.6.2
 #   PyQt5                the GUI framework
+#                        licence: GPL-3.0-only
 PyQt5==5.15.11
 #   PyQt5-Qt5            the Qt5 runtime shipped with the wheel (PyQt5 needs it)
+#                        licence: LGPL-3.0-only
 PyQt5-Qt5==5.15.2
+#                        licence: not recorded
 PyQt5_sip==12.15.0
 #   PyQtWebEngine        renders Help > User manual inside the application
+#                        licence: GPL-3.0-only
 PyQtWebEngine==5.15.7
 #   PyQtWebEngine-Qt5    its matching QtWebEngine runtime
+#                        licence: LGPL-3.0-only
 PyQtWebEngine-Qt5==5.15.2
+#                        licence: not recorded
 typing_extensions==4.13.2
 
 # -------------------------------------------------------------------------
 # TEST - only needed by the test suite
 # -------------------------------------------------------------------------
 #   pyftpdlib            only used by tests/test_ftp_roundtrip.py (in-process server)
+#                        licence: MIT
 pyftpdlib==2.2.0
 
 # -------------------------------------------------------------------------
 # BUILD - only needed to produce the exe
 # -------------------------------------------------------------------------
 #   altgraph             PyInstaller dependency
+#                        licence: MIT
 altgraph==0.17.5
 #   brotli               fontTools needs it to write WOFF2 font subsets
+#                        licence: MIT
 brotli==1.2.0
 #   fonttools            subsets the manual's fonts; without it the PDF embeds whole font files and grows from 5 MB to 37 MB
+#                        licence: MIT
 fonttools==4.57.0
 #   importlib_metadata   PyInstaller dependency
+#                        licence: Apache-2.0
 importlib_metadata==8.5.0
 #   packaging            PyInstaller dependency
+#                        licence: Apache-2.0 OR BSD-2-Clause
 packaging==26.2
 #   pefile               PyInstaller dependency
+#                        licence: MIT
 pefile==2024.8.26
 #   pyinstaller          builds the exe; 6.x dropped Python 3.8 so this stays 5.13.2
+#                        licence: GPL-2.0-or-later WITH Bootloader-exception
 pyinstaller==5.13.2
 #   pyinstaller-hooks-contrib PyInstaller hooks
+#                        licence: Apache-2.0 OR GPL-2.0-or-later
 pyinstaller-hooks-contrib==2026.8
+#                        licence: AGPL-3.0-only
 PyMuPDF==1.24.11
 #   pywin32-ctypes       PyInstaller dependency
+#                        licence: BSD-3-Clause
 pywin32-ctypes==0.2.3
 #   setuptools           PyInstaller dependency
+#                        licence: MIT
 setuptools==75.3.4
 #   zipp                 importlib_metadata dependency
+#                        licence: MIT
 zipp==3.20.2
+
+# =========================================================================
+#  LICENCES
+# =========================================================================
+#  Read from each distribution's own metadata (License-Expression, License
+#  or the OSI classifier); run tools/deps_report.py to re-check them.
+#
+#  RUNTIME
+#      bcrypt                     Apache-2.0
+#      cffi                       MIT
+#      cryptography               Apache-2.0 OR BSD-3-Clause
+#      paramiko                   LGPL-2.1-or-later
+#      pycparser                  BSD-3-Clause
+#      PyNaCl                     Apache-2.0
+#      PyQt5                      GPL-3.0-only
+#      PyQt5-Qt5                  LGPL-3.0-only
+#      PyQt5_sip                  SIP
+#      PyQtWebEngine              GPL-3.0-only
+#      PyQtWebEngine-Qt5          LGPL-3.0-only
+#      typing_extensions          PSF-2.0
+#
+#  TEST
+#      pyftpdlib                  MIT
+#
+#  BUILD
+#      altgraph                   MIT
+#      brotli                     MIT
+#      fonttools                  MIT
+#      importlib_metadata         Apache-2.0
+#      packaging                  Apache-2.0 OR BSD-2-Clause
+#      pefile                     MIT
+#      pyinstaller                GPL-2.0-or-later WITH Bootloader-exception
+#      pyinstaller-hooks-contrib  Apache-2.0 OR GPL-2.0-or-later
+#      PyMuPDF                    AGPL-3.0-only
+#      pywin32-ctypes             BSD-3-Clause
+#      setuptools                 MIT
+#      zipp                       MIT
+#
+#  What this means for distributing BlueBird.exe
+#
+#  * PyQt5
+#      GPL-3.0 or a commercial licence from Riverbank. Distributing the exe
+#      under the GPL is what makes this compliant; a closed source build
+#      needs the commercial licence.
+#  * PyQt5-Qt5
+#      the Qt libraries themselves, used under the LGPL option. They are
+#      shipped as separate DLLs (dynamic linking), which is the condition
+#      the LGPL attaches.
+#  * PyMuPDF
+#      AGPL-3.0. Used only by tools/build_manual.py to add the manual's
+#      table of contents links and bookmarks, so it is a build tool and is
+#      not part of the distributed exe.
+#  * pyinstaller
+#      the bootloader exception is what lets a GPL-2.0 build tool package a
+#      program under other terms.
+#  * everything else is MIT, BSD, Apache-2.0, PSF or LGPL, all of which
+#      only require the licence text to travel with the binaries.
+# =========================================================================

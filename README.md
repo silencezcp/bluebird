@@ -53,13 +53,39 @@ run.cmd ftp://user@192.168.1.10
 
 ### 依赖清单（从真实环境导出，已验证）
 
-`requirements.txt` 是**完整清单（22 个固定版本）**，分三段：
+`requirements.txt` 是**完整清单（25 个固定版本）**，分三段，**每个库都标注了授权协议**：
 
 | 段 | 包数 | 内容 |
 |---|---|---|
 | **RUNTIME** | 12 | `PyQt5` / `PyQt5-Qt5` / `PyQt5_sip` / `PyQtWebEngine` / `PyQtWebEngine-Qt5` / `paramiko`，加上其传递依赖 `cryptography` / `PyNaCl` / `bcrypt` / `cffi` / `pycparser` / `typing_extensions` |
 | **TEST** | 1 | `pyftpdlib`（自动化测试用的内嵌 FTP 服务器） |
-| **BUILD** | 9 | `pyinstaller`（锁 5.13.2，6.x 已不支持 Python 3.8）及其依赖 |
+| **BUILD** | 12 | `pyinstaller`（锁 5.13.2，6.x 已不支持 Python 3.8）及其依赖，加手册构建工具链 `fonttools` / `brotli` / `PyMuPDF` |
+
+#### 授权协议
+
+| 协议 | 库 |
+|---|---|
+| **GPL-3.0** | `PyQt5`、`PyQtWebEngine` |
+| **LGPL-3.0** | `PyQt5-Qt5`、`PyQtWebEngine-Qt5`（随附的 Qt 库本体，按 LGPL 选项使用） |
+| **LGPL-2.1-or-later** | `paramiko` |
+| **AGPL-3.0** | `PyMuPDF`（**仅构建手册用，不随 exe 分发**） |
+| **Apache-2.0** | `bcrypt`、`PyNaCl`、`brotli`、`importlib_metadata` |
+| **Apache-2.0 或 BSD** | `cryptography`（Apache-2.0 / BSD-3-Clause）、`packaging`（Apache-2.0 / BSD-2-Clause） |
+| **MIT** | `cffi`、`pyftpdlib`、`altgraph`、`fonttools`、`pefile`、`setuptools`、`zipp` |
+| **BSD-3-Clause** | `pycparser`、`pywin32-ctypes` |
+| **PSF-2.0** | `typing_extensions` |
+| **SIP** | `PyQt5_sip`（Riverbank 自有协议，BSD 风格） |
+| **GPL-2.0 + Bootloader 例外** | `pyinstaller`（构建工具；该例外正是允许它打包非 GPL 程序的原因） |
+
+> ⚠️ **分发 exe 前必读**：`PyQt5` 是 **GPL-3.0 或商业授权**二选一。
+> 以 GPL-3.0 分发本程序即满足其条件；若要**闭源分发**，必须向 Riverbank
+> 购买商业授权。随附的 Qt DLL 走 LGPL 选项（动态链接，满足其条件）。
+> 其余库均为宽松协议，只需随二进制附带协议全文。
+
+协议不是手写的，而是**从每个库自己的元数据读取**（`License-Expression` /
+`License` / OSI 分类器），并由 `tools/deps_report.py` 的审计步骤**逐一核对**——
+本次 25 项全部通过（`all 25 entries agree with the installed metadata`）。
+若某个库改了协议，运行该工具会立刻报出来。
 
 三个关键传递依赖不能省：
 
@@ -91,7 +117,7 @@ D:\DSH_Workspaces\Ftp\python.exe -m pip install -r requirements.txt ^
 
 > **验证方式**：本清单已在**全新 venv** 中实测——22 个包版本与固定值完全一致，
 > 应用自检通过（Qt / web engine / PyNaCl / Ed25519 签名 / 手册渲染），
-> 两套测试 **48 + 320 全部通过**。这证明清单既**充分**（不缺包）又**最小**
+> 两套测试 **69 + 320 全部通过**。这证明清单既**充分**（不缺包）又**最小**
 > （无多余包）。
 >
 > `pyqt5-tools` 不需要：界面全部用纯 Python + QSS + 运行时生成的 SVG 图标写成，

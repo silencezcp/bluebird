@@ -22,8 +22,9 @@ from __future__ import annotations
 import ast
 import io
 import os
+import re
 import sys
-from typing import Dict, List, Set, Tuple
+from typing import Dict, List, Optional, Set, Tuple
 
 from importlib_metadata import distribution, distributions
 
@@ -247,8 +248,20 @@ def main() -> int:
     for title, rows in groups:
         print("=== %s ===" % title)
         for name, version in rows:
-            print("   %-28s %s" % (name, version))
+            print("   %-28s %-14s %s"
+                  % (name, version, LICENSES.get(name, "(unrecorded)")))
         print()
+
+    every = [name for _title, rows in groups for name, _version in rows]
+    print("=== licence check ===")
+    problems = check_licenses_rows(every)
+    if problems:
+        for line in problems:
+            print("   ! %s" % line)
+        print("   %d entr(ies) to check" % len(problems))
+    else:
+        print("   all %d entries agree with the installed metadata" % len(every))
+    print()
 
     installed = {d.metadata["Name"]: d.version for d in distributions()
                  if d.metadata["Name"]}
@@ -264,6 +277,246 @@ def main() -> int:
     if "--write" in sys.argv:
         write_requirements(groups, installed)
     return 0
+
+
+#: SPDX identifiers for the licences that ship with this application.  Blank
+#: values mean the distribution does not declare one in any metadata field; the
+#: audit prints those rather than inventing an answer.
+LICENSES = {
+    # runtime
+    "PyQt5": "GPL-3.0-only",
+    "PyQt5-sip": "SIP",
+    "PyQt5-Qt5": "LGPL-3.0-only",
+    "PyQtWebEngine": "GPL-3.0-only",
+    "PyQtWebEngine-Qt5": "LGPL-3.0-only",
+    "paramiko": "LGPL-2.1-or-later",
+    "cryptography": "Apache-2.0 OR BSD-3-Clause",
+    "PyNaCl": "Apache-2.0",
+    "bcrypt": "Apache-2.0",
+    "cffi": "MIT",
+    "pycparser": "BSD-3-Clause",
+    "typing-extensions": "PSF-2.0",
+    # tests
+    "pyftpdlib": "MIT",
+    # build
+    "pyinstaller": "GPL-2.0-or-later WITH Bootloader-exception",
+    "pyinstaller-hooks-contrib": "Apache-2.0 OR GPL-2.0-or-later",
+    "altgraph": "MIT",
+    "pefile": "MIT",
+    "pywin32-ctypes": "BSD-3-Clause",
+    "setuptools": "MIT",
+    "packaging": "Apache-2.0 OR BSD-2-Clause",
+    "importlib_metadata": "Apache-2.0",
+    "zipp": "MIT",
+    # documentation toolchain: used to build the manual, not shipped in the exe
+    "fonttools": "MIT",
+    "brotli": "MIT",
+    "PyMuPDF": "AGPL-3.0-only",
+}
+
+#: licences worth a word of explanation in the generated file
+LICENSE_NOTES = {
+    "PyQt5": "GPL-3.0 or a commercial licence from Riverbank.  Distributing "
+             "the exe under the GPL is what makes this compliant; a closed "
+             "source build needs the commercial licence.",
+    "PyQt5-Qt5": "the Qt libraries themselves, used under the LGPL option.  "
+                 "They are shipped as separate DLLs (dynamic linking), which "
+                 "is the condition the LGPL attaches.",
+    "PyQtWebEngine": "same terms as PyQt5",
+    "PyQtWebEngine-Qt5": "same terms as PyQt5-Qt5",
+    "PyMuPDF": "AGPL-3.0.  Used only by tools/build_manual.py to add the "
+               "manual's table of contents links and bookmarks, so it is a "
+               "build tool and is not part of the distributed exe.",
+    "pyinstaller": "the bootloader exception is what lets a GPL-2.0 build "
+                   "tool package a program under other terms.",
+    "SIP": "",
+}
+
+
+#: Licence families, most specific first, each with a version pattern.  Free
+#: text metadata ("GNU AFFERO GPL 3.0", "Apache Software License") is matched
+#: against these rather than being stripped down blindly, which mangled both
+#: "GPLv2" and "2.0".
+_LICENCE_PATTERNS = (
+    ("agpl", r"affero|agpl", (0, 3)),
+    ("lgpl", r"lgpl|lesser general public|library or lesser", (2, 1)),
+    ("gpl", r"gpl|gnu general public", (2, 0)),
+    ("apache", r"apache", (2, 0)),
+    ("bsd", r"bsd", (3, 0)),
+    ("mit", r"\bmit\b", (0, 0)),
+    ("psf", r"psf|python software foundation", (2, 0)),
+    ("mpl", r"mozilla public|mpl", (2, 0)),
+    ("isc", r"\bisc\b", (0, 0)),
+    ("zlib", r"zlib", (0, 0)),
+    ("sip", r"^sip\b|sip license", (0, 0)),
+    ("unlicense", r"unlicense", (0, 0)),
+)
+
+
+def _normalise(text: str) -> str:
+    """Reduce a licence name to a comparable key, or '' when unrecognised.
+
+    Recognising a family and its version is what makes "GPL v3" and
+    "GPL-3.0-only" compare equal without also making "GPLv2" equal to them.
+    """
+    lowered = text.lower()
+    # the family, then the major.minor version seen next to it
+    for family, pattern, default in _LICENCE_PATTERNS:
+        if not re.search(pattern, lowered):
+            continue
+        # only a real version counts: "2.0", "v3", "version 2.1".  A bare digit
+        # is not enough, because "PyQt5" and "GPLv2 (GPLv2)" otherwise supply
+        # the wrong number.
+        version = (re.search(r"(?:v|version[\s-]*)(\d+)(?:[.\s-](\d+))?", lowered)
+                   or re.search(r"\b(\d+)\.(\d+)", lowered))
+        if version:
+            major = int(version.group(1))
+            minor = int(version.group(2) or 0)
+        else:
+            major, minor = default
+        if family in ("mit", "isc", "zlib", "unlicense", "sip"):
+            return family
+        if family == "bsd":
+            # BSD is told apart by its clause count, not its version
+            if "2" in lowered and "clause" in lowered:
+                return "bsd2clause"
+            if "3" in lowered and "clause" in lowered:
+                return "bsd3clause"
+            return "bsd"
+        return "%s%d%d" % (family, major, minor)
+    return ""
+
+
+def declared_license(name: str) -> Tuple[str, str]:
+    """What the installed distribution says: (text, where it came from)."""
+    try:
+        meta = distribution(name).metadata
+    except Exception:
+        return "", ""
+    for field in ("License-Expression", "License"):
+        value = (meta.get(field) or "").strip()
+        if value and len(value) < 120:
+            return value, field
+    for classifier in meta.get_all("Classifier") or []:
+        if classifier.startswith("License ::"):
+            return classifier.split("::")[-1].strip(), "Classifier"
+    # a licence file inside the wheel is the last resort
+    try:
+        files = distribution(name).files or []
+    except Exception:
+        files = []
+    for entry in files:
+        base = os.path.basename(str(entry))
+        if "licen" in base.lower() or base.upper().startswith("COPYING"):
+            return base, "licence file"
+    return "", ""
+
+
+def check_licenses(names: "List[str]") -> "List[str]":
+    """Compare the table above with the metadata.  Returns complaints."""
+    problems = []
+    for name in names:
+        expected = licence_of(name)
+        if expected is None:
+            problems.append("%s: no licence recorded in LICENSES" % name)
+            continue
+        if not expected:
+            continue                      # deliberately blank
+        declared, source = declared_license(name)
+        if not declared:
+            problems.append("%s: declares no licence (%s expected)"
+                            % (name, expected))
+            continue
+        if source == "licence file":
+            # a licence file is present but no field names the licence, so
+            # there is nothing to compare against
+            continue
+        # SPDX "A OR B" expressions are satisfied by either half
+        halves = [part.strip() for part in expected.replace(" OR ", "|")
+                  .replace(" AND ", "|").split("|")]
+        if any(_normalise(part) and _normalise(part) in _normalise(declared)
+               for part in halves):
+            continue
+        problems.append("%s: table says %s, metadata says %r (%s)"
+                        % (name, expected, declared, source))
+    return problems
+
+
+def _licence_key(name: str) -> str:
+    """The LICENSES key for a distribution name.
+
+    Wheel names are inconsistent - PyQt5_sip, typing_extensions - so the table
+    is keyed on a normalised form.
+    """
+    return name.strip().lower().replace("_", "-")
+
+
+#: LICENSES keyed by the normalised distribution name, built once
+_LICENCE_INDEX: Dict[str, str] = {}
+
+
+def licence_of(name: str) -> "Optional[str]":
+    """The recorded licence for a distribution, or None when unrecorded."""
+    if not _LICENCE_INDEX:
+        for key, value in LICENSES.items():
+            _LICENCE_INDEX[_licence_key(key)] = value
+    return _LICENCE_INDEX.get(_licence_key(name))
+
+
+def check_licenses_rows(rows: "List") -> "List[str]":
+    """check_licenses over (name, version) rows."""
+    return check_licenses(list(rows))
+
+
+def licence_summary(groups) -> "List[str]":
+    """A closing section that names the licences and the obligations."""
+    lines = [
+        "# " + "=" * 73,
+        "#  LICENCES",
+        "# " + "=" * 73,
+        "#  Read from each distribution's own metadata (License-Expression, "
+        "License",
+        "#  or the OSI classifier); run tools/deps_report.py to re-check them.",
+        "#",
+    ]
+    for title, rows in groups:
+        if not rows:
+            continue
+        lines.append("#  %s" % title)
+        for name, _version in rows:
+            lines.append("#      %-26s %s"
+                         % (name, licence_of(name) or "not recorded"))
+        lines.append("#")
+    lines.append("#  What this means for distributing BlueBird.exe")
+    lines.append("#")
+    for name in ("PyQt5", "PyQt5-Qt5", "PyMuPDF", "pyinstaller"):
+        note = LICENSE_NOTES.get(name)
+        if note:
+            lines.append("#  * %s" % name)
+            for chunk in _wrap(note, 68):
+                lines.append("#      %s" % chunk)
+    lines.append("#  * everything else is MIT, BSD, Apache-2.0, PSF or "
+                 "LGPL, all of which")
+    lines.append("#      only require the licence text to travel with the "
+                 "binaries.")
+    lines.append("# " + "=" * 73)
+    return lines
+
+
+def _wrap(text: str, width: int) -> "List[str]":
+    """Break a sentence into lines, so the output stays readable."""
+    words = text.split()
+    out: List[str] = []
+    line = ""
+    for word in words:
+        if line and len(line) + 1 + len(word) > width:
+            out.append(line)
+            line = word
+            continue
+        line = ("%s %s" % (line, word)).strip()
+    if line:
+        out.append(line)
+    return out
 
 
 def write_requirements(groups, installed) -> None:
@@ -302,8 +555,12 @@ def write_requirements(groups, installed) -> None:
             note = NOTES.get(name)
             if note:
                 lines.append("#   %-20s %s" % (name, note))
+            lines.append("#   %-20s %s" % ("", "licence: %s"
+                                           % LICENSES.get(name, "not recorded")))
             lines.append("%s==%s" % (name, version))
         lines.append("")
+
+    lines.extend(licence_summary(groups))
 
     target = os.path.join(ROOT, "requirements.txt")
     payload = "\n".join(lines)
