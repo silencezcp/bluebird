@@ -245,6 +245,67 @@ def main():
                   "refused" in exc.message.lower() or "connect" in exc.message.lower(),
                   exc.message)
 
+        print("\n-- a chatty server must not break transfers --")
+        # Some servers (and proxies) repeat the completion line.  ftplib's
+        # voidresp() rejects anything that is not a 2xx and raises with the bare
+        # response text, so one stray "226 Transfer complete." used to make a
+        # successful download report as failed with exactly that message.
+        chatty_root = os.path.join(workdir, "chatty")
+        os.makedirs(chatty_root, exist_ok=True)
+        make_tree(chatty_root)
+        chatty = TestFTPServer(chatty_root, chatty=True)
+        chatty_host, chatty_port = chatty.start()
+        talkative = S.create_session({
+            "protocol": "ftp", "host": chatty_host, "port": chatty_port,
+            "user": "tester", "password": "secret", "timeout": 15})
+        try:
+            talkative.connect()
+            names = [e.name for e in talkative.listdir()]
+            flac = [n for n in names if n.endswith(".flac")]
+            check("the chatty server lists the music files", len(flac) == 2,
+                  str(names))
+            failures = []
+            for name in flac:
+                target = os.path.join(local_root, "chatty_" + name)
+                try:
+                    got = talkative.download_file(name, target)
+                except Exception as exc:  # noqa: BLE001
+                    failures.append("%s: %s" % (name, S.human_error(exc)))
+                    continue
+                expected = os.path.getsize(os.path.join(chatty_root, name))
+                if got != expected:
+                    failures.append("%s: %d/%d bytes" % (name, got, expected))
+                elif open(target, "rb").read() != open(
+                        os.path.join(chatty_root, name), "rb").read():
+                    failures.append("%s: content differs" % name)
+            check("stray completion replies do not fail the download",
+                  not failures, "; ".join(failures))
+            check("a non-ASCII name with spaces downloads intact",
+                  os.path.isfile(os.path.join(
+                      local_root, "chatty_" + flac[0])),
+                  flac[0])
+            # the session must still be usable afterwards
+            check("the session is still usable after the stray reply",
+                  len(talkative.listdir()) == len(names),
+                  str(len(talkative.listdir())))
+            # and a second pass must work too - a desync would show up here
+            again = 0
+            for name in flac:
+                try:
+                    talkative.download_file(
+                        name, os.path.join(local_root, "again_" + name))
+                    again += 1
+                except Exception:  # noqa: BLE001
+                    pass
+            check("a second pass over the same files also succeeds",
+                  again == len(flac), "%d/%d" % (again, len(flac)))
+        finally:
+            try:
+                talkative.disconnect()
+            except Exception:
+                pass
+            chatty.stop()
+
         print("\n-- cancel a transfer --")
         control = S.TransferControl()
         control.cancel()

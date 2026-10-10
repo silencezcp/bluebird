@@ -9,3 +9,4 @@ dist/
 nacreftp-startup.log
 .smoke/
 .smoketest/
+COMMIT_MSG.txt

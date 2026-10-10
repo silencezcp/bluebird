@@ -600,6 +600,7 @@ class FTPSession(BaseSession):
 
     # -- listing --------------------------------------------------------
     def listdir(self, path: Optional[str] = None) -> List[Entry]:
+        self._sync_control()
         with self.lock:
             self._reconnect()
             ftp = self.ftp
@@ -763,17 +764,22 @@ class FTPSession(BaseSession):
     def stat_file(self, name: str) -> Optional[Dict[str, Any]]:
         """Ask the server for one file's size (RFC 3659 ``SIZE``).
 
-        Most servers refuse ``SIZE`` while the control connection is in ASCII
-        mode, so switch to binary first - which is what every client does
-        before a transfer anyway.
+        Some servers refuse ``SIZE`` while the control connection is in ASCII
+        mode, so binary mode is requested first - which is what every client
+        does before a transfer anyway.  Any stale reply is cleared beforehand,
+        otherwise ``SIZE`` reads the previous command's answer and from that
+        point on the whole session is one response behind.
         """
+        self._sync_control()
         info: Dict[str, Any] = {}
         with self.lock:
             ftp = self._ftp
             if ftp is None:
                 return None
             try:
-                ftp.voidcmd("TYPE I")
+                # voidcmd() is avoided on purpose: it raises when the server
+                # answers with a 2xx other than 200, which some do here
+                ftp.sendcmd("TYPE I")
             except FTP_ERRORS:
                 pass
             try:
@@ -828,15 +834,67 @@ class FTPSession(BaseSession):
                 raise SessionError("Server refused transfer: %s" % response.strip())
             return data
 
+    def _remote_size(self, name: str) -> Optional[int]:
+        """Best-effort size lookup that never raises and never desyncs.
+
+        ``SIZE`` is refused by many servers while the control connection is in
+        ASCII mode ("550 SIZE not allowed in ASCII mode"), so binary mode is
+        requested first.  Any failure here is only used for the progress bar,
+        so it must not be able to fail the transfer itself.
+        """
+        with self.lock:
+            ftp = self._ftp
+            if ftp is None:
+                return None
+            try:
+                # sendcmd() rather than voidcmd(): some servers answer with a
+                # non-200 2xx here and voidcmd() would raise
+                ftp.sendcmd("TYPE I")
+            except FTP_ERRORS:
+                pass
+            try:
+                value = ftp.size(name)
+                if value is None:
+                    return None
+                return int(value)
+            except FTP_ERRORS + (TypeError, ValueError):
+                return None
+
+    def switch_to_binary(self) -> bool:
+        """Put the data connection in binary (image) mode."""
+        self._sync_control()
+        with self.lock:
+            ftp = self._ftp
+            if ftp is None:
+                return False
+            try:
+                ftp.sendcmd("TYPE I")
+                return True
+            except FTP_ERRORS:
+                return False
+
+    def _begin_transfer(self, command: str) -> socket.socket:
+        """Open the data connection for ``command``.
+
+        If the first attempt is refused the control channel may have slipped by
+        one reply, so it is drained and the attempt is repeated once.  Without
+        this a single stray informational reply turns into a failed transfer.
+        """
+        try:
+            return self._pasv_socket(command)
+        except SessionError:
+            if not self._drain_control(settle=0.15, max_wait=0.8):
+                raise
+            return self._pasv_socket(command)
+
     def download_file(self, remote_name: str, local_path: str,
                       progress: ProgressFn = None,
                       control: Optional[TransferControl] = None) -> int:
-        total: Optional[int] = None
-        try:
-            total = self.ftp.size(remote_name)
-        except Exception:
-            total = None
-        data = self._pasv_socket("RETR " + remote_name)
+        # a transfer that is already cancelled must raise before any command is
+        # sent, otherwise the server is left with a half-open data connection
+        self._check(control)
+        total = self._remote_size(remote_name)
+        data = self._begin_transfer("RETR " + remote_name)
         done = 0
         try:
             self._report(progress, 0, total)
@@ -873,11 +931,13 @@ class FTPSession(BaseSession):
     def upload_file(self, local_path: str, remote_name: str,
                     progress: ProgressFn = None,
                     control: Optional[TransferControl] = None) -> int:
+        self._sync_control()
         try:
             total: Optional[int] = os.path.getsize(local_path)
         except OSError:
             total = None
-        data = self._pasv_socket("STOR " + remote_name)
+        self._check(control)
+        data = self._begin_transfer("STOR " + remote_name)
         done = 0
         try:
             with open(local_path, "rb") as handle:
@@ -933,16 +993,108 @@ class FTPSession(BaseSession):
         self._ftp = None
         self._connected = False
 
-    def _finish_command(self) -> None:
-        """Read the trailing 226 response (tolerate chatty servers)."""
+    # -- control channel hygiene ----------------------------------------
+    def _drain_control(self, settle: float = 0.35, max_wait: float = 1.5,
+                       require_one: bool = False) -> int:
+        """Read and discard trailing 2xx chatter on the control connection.
+
+        Chatty servers send an extra informational reply (typically a second
+        ``226``) once a transfer ends, and it can arrive a moment *after* the
+        data connection closes.  If it is left in the channel the next command
+        reads it instead of its own reply, and from then on every response
+        belongs to the previous command - which is exactly how a successful
+        transfer gets reported as failed with the message
+        "226 Transfer complete.".
+
+        With ``require_one`` the call waits until at least one 2xx has been
+        consumed, because a completed transfer is always followed by exactly
+        one completion reply.  Returning early there is what lets a late reply
+        slip into the next command.
+
+        Only 2xx replies are consumed; anything else is left for the command
+        that actually expects it.
+        """
         ftp = self._ftp
         if ftp is None:
-            return
+            return 0
+        drained = 0
+        deadline = time.time() + max_wait
+        while time.time() < deadline:
+            if drained and not self._control_has_data(ftp, settle):
+                break
+            if not drained and not self._control_has_data(ftp, settle):
+                if require_one:
+                    continue          # keep waiting for the reply
+                break
+            try:
+                response = ftp.getmultiline()
+            except (ftplib.error_proto, ftplib.error_reply, OSError, EOFError):
+                break
+            except Exception:
+                break
+            code = response[:3]
+            if not code.isdigit() or not code.startswith("2"):
+                return drained
+            drained += 1
+            if not require_one:
+                continue
+            if drained and not self._control_has_data(ftp, settle):
+                break
+        return drained
+
+    @staticmethod
+    def _control_has_data(ftp: Any, timeout: float) -> bool:
+        """True when a reply is already buffered or readable right now."""
+        reader = getattr(ftp, "file", None)
         try:
-            with self.lock:
-                ftp.voidresp()
+            if reader is not None and getattr(reader, "_peek", b""):
+                return True
         except Exception:
             pass
+        sock = getattr(ftp, "sock", None)
+        if sock is None:
+            return False
+        try:
+            ready, _, _ = select.select([sock], [], [], timeout)
+        except (OSError, ValueError):
+            return False
+        return bool(ready)
+
+    def _sync_control(self) -> None:
+        """Discard any stray 2xx waiting before the next command.
+
+        FTP guarantees exactly one reply per command, so a reply already queued
+        *before* a command is sent cannot be that command's answer - it is
+        leftover chatter (a chatty server or a proxy repeating the completion
+        line).  Reading it later would shift every following response by one,
+        which is how a successful transfer ends up reported as
+        "226 Transfer complete.".
+
+        The drain is bounded and consumes only 2xx replies, so a genuine error
+        that arrived early is left in place for the command that expects it.
+        """
+        if self._ftp is None:
+            return
+        with self.lock:
+            try:
+                self._drain_control(settle=0.05, max_wait=0.25)
+            except Exception:
+                pass
+
+    def _finish_command(self) -> None:
+        """Consume the completion reply (and any extra chatter) after a
+        data transfer.
+
+        ``ftplib.voidresp()`` is too strict here: it rejects anything that is
+        not a 2xx *and* raises with the bare response text, so a server that
+        sends an extra informational ``226`` makes a successful transfer look
+        like a failure.  The data socket already reached EOF, so the transfer
+        itself is done - the rest is bookkeeping.
+        """
+        if self._ftp is None:
+            return
+        with self.lock:
+            self._drain_control(settle=0.35, max_wait=2.0, require_one=True)
 
     def read_text(self, name: str, limit: int = 1024 * 1024) -> str:
         buffer = io.BytesIO()
@@ -1085,6 +1237,7 @@ class SFTPSession(BaseSession):
 
     # -- listing --------------------------------------------------------
     def listdir(self, path: Optional[str] = None) -> List[Entry]:
+        self._sync_control()
         with self.lock:
             target = path if path is not None else (self._cwd or ".")
             try:
@@ -1279,6 +1432,7 @@ class SFTPSession(BaseSession):
     def upload_file(self, local_path: str, remote_name: str,
                     progress: ProgressFn = None,
                     control: Optional[TransferControl] = None) -> int:
+        self._sync_control()
         try:
             total: Optional[int] = os.path.getsize(local_path)
         except OSError:
