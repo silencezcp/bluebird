@@ -16,6 +16,10 @@ except ImportError:  # pragma: no cover - optional dependency
     HAVE_PYFTPDLIB = False
 
 
+#: incremented per server so each one gets its own passive port range
+_PASSIVE_SEQ = 0
+
+
 class TestFTPServer(object):
     """Serves a directory on 127.0.0.1 with a random port."""
 
@@ -31,6 +35,12 @@ class TestFTPServer(object):
         #: send an extra informational reply after each transfer, to exercise
         #: the "successful transfer reported as a failure" regression
         self.chatty = chatty
+        # Each server needs its OWN passive port range: two servers sharing one
+        # range fight over the ports and connections die mid-transfer
+        # (EOFError from the control connection).
+        global _PASSIVE_SEQ
+        _PASSIVE_SEQ += 1
+        self.passive_base = 60000 + _PASSIVE_SEQ * 60
         self._server: Optional[Any] = None
         self._thread: Optional[threading.Thread] = None
 
@@ -46,9 +56,8 @@ class TestFTPServer(object):
         handler = type("Handler_%d" % id(self), (base,), {
             "authorizer": authorizer,
             "banner": "Nacre test server ready.",
-            "passive_ports": range(60000, 60050),
-            # separate passive range per server is impossible with a shared
-            # range, so the port is chosen by the OS anyway
+            "passive_ports": range(self.passive_base,
+                                   self.passive_base + 40),
         })
 
         server = FTPServer((self.host, 0), handler)

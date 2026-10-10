@@ -119,19 +119,18 @@ class TransferQueuePanel(QWidget):
         self.table.setShowGrid(False)
         self.table.setWordWrap(False)
         self.table.setItemDelegateForColumn(
-            3, ProgressDelegate(theme, self.table))
+            4, ProgressDelegate(theme, self.table))
         # the remaining columns get the plain separator delegate so the column
         # rules are continuous from the header to the last row
         self._separators = ColumnSeparatorDelegate(theme, self.table,
                                                    "gridline", 2)
-        self.table.setItemDelegateForColumn(0, self._separators)
-        self.table.setItemDelegateForColumn(1, self._separators)
-        self.table.setItemDelegateForColumn(2, self._separators)
-        self.table.setItemDelegateForColumn(4, self._separators)
-        self.table.setItemDelegateForColumn(5, self._separators)
+        for column in (0, 1, 2, 3, 5, 6):
+            self.table.setItemDelegateForColumn(column, self._separators)
         header = self.table.horizontalHeader()
-        header.setSectionResizeMode(0, QHeaderView.Stretch)
-        for column, width in ((1, 100), (2, 90), (3, 130), (4, 100), (5, 170)):
+        # Time is narrow and fixed: "HH:MM:SS" never needs more than ~64 px
+        header.setSectionResizeMode(1, QHeaderView.Stretch)
+        for column, width in ((0, 68), (2, 100), (3, 90), (4, 130), (5, 100),
+                              (6, 170)):
             header.setSectionResizeMode(column, QHeaderView.Interactive)
             self.table.setColumnWidth(column, width)
         self.table.setContextMenuPolicy(Qt.CustomContextMenu)
@@ -263,6 +262,8 @@ class MainWindow(QMainWindow):
         #: uids that settled in the current batch; they share one dialog
         self._finished_uids: List[int] = []
         self._flush_scheduled = False
+        #: "Yes to all" applies to the current batch only, then resets
+        self._overwrite_all = False
         # a member timer (not a bare singleShot) so it can be cancelled when
         # the window closes or a test wants a deterministic flush
         self._flush_timer = QTimer(self)
@@ -920,53 +921,63 @@ class MainWindow(QMainWindow):
     # context menu
     # ------------------------------------------------------------------
     def _on_context_menu(self, pane: FilePane, point: Any) -> None:
+        menu = self.build_context_menu(pane)
+        if menu.actions():
+            menu.exec_(pane.table.viewport().mapToGlobal(point))
+
+    def build_context_menu(self, pane: FilePane) -> QMenu:
+        """Build (but do not show) the right-click menu for a pane.
+
+        Kept separate from :meth:`_on_context_menu` so the menu can be
+        inspected - and translated - without opening a modal popup.
+        """
         menu = QMenu(self)
         entries = pane.selected_entries()
-        viewport_point = pane.table.viewport().mapToGlobal(point)
 
         if pane.local:
             if entries:
                 menu.addAction(self.icons.action_icon("upload", size=18),
-                               "Upload to the server", self.upload_selection)
+                               T("Upload to the server"), self.upload_selection)
             menu.addAction(self.icons.action_icon("new_folder", size=18),
-                           "Create folder…", self.local_mkdir)
+                           T("Create folder…"), self.local_mkdir)
             menu.addAction(self.icons.action_icon("refresh", size=18),
-                           "Refresh", pane.refresh)
+                           T("Refresh"), pane.refresh)
             if entries:
                 menu.addSeparator()
                 menu.addAction(self.icons.action_icon("rename", size=18),
-                               "Rename…", self.local_rename)
+                               T("Rename…"), self.local_rename)
                 menu.addAction(self.icons.action_icon("delete", size=18),
-                               "Delete", self.local_delete)
+                               T("Delete"), self.local_delete)
                 menu.addSeparator()
-                menu.addAction("Properties", self.show_properties)
+                menu.addAction(T("Properties"), self.show_properties)
         else:
             if entries:
                 menu.addAction(self.icons.action_icon("download", size=18),
-                               "Download to the local folder", self.download_selection)
+                               T("Download to the local folder"),
+                               self.download_selection)
             if self.session is not None and self.session.connected:
                 menu.addAction(self.icons.action_icon("new_folder", size=18),
-                               "Create directory…", self.remote_mkdir)
+                               T("Create directory…"), self.remote_mkdir)
                 menu.addAction(self.icons.action_icon("new_file", size=18),
-                               "Create empty file…", self.remote_new_file)
+                               T("Create empty file…"), self.remote_new_file)
                 menu.addAction(self.icons.action_icon("refresh", size=18),
-                               "Refresh", pane.refresh)
+                               T("Refresh"), pane.refresh)
                 if entries:
                     menu.addSeparator()
                     menu.addAction(self.icons.action_icon("edit", size=18),
-                                   "Edit", self.edit_remote_file)
+                                   T("Edit"), self.edit_remote_file)
                     menu.addAction(self.icons.action_icon("rename", size=18),
-                                   "Rename…", self.remote_rename)
+                                   T("Rename…"), self.remote_rename)
                     menu.addAction(self.icons.action_icon("delete", size=18),
-                                   "Delete", self.remote_delete)
+                                   T("Delete"), self.remote_delete)
                     if len(entries) == 1 and entries[0].is_dir:
                         menu.addAction(self.icons.action_icon("sync", size=18),
-                                       "Calculate folder size", self.remote_folder_size)
+                                       T("Calculate folder size"),
+                                       self.remote_folder_size)
                     menu.addSeparator()
-                    menu.addAction("Permissions…", self.remote_chmod)
-                    menu.addAction("Properties", self.show_properties)
-        if menu.actions():
-            menu.exec_(viewport_point)
+                    menu.addAction(T("Permissions…"), self.remote_chmod)
+                    menu.addAction(T("Properties"), self.show_properties)
+        return menu
 
     # ------------------------------------------------------------------
     # helpers to resolve the "other" pane
@@ -1013,6 +1024,7 @@ class MainWindow(QMainWindow):
         items = [i for i in items if self._confirm_overwrite_upload(i)]
         if not items:
             return
+        self._overwrite_all = False
         self.manager.enqueue(items)
         total = sum(int(i.size or 0) for i in items)
         self.log("info", "Queued %d item(s) for upload (%s)"
@@ -1046,6 +1058,7 @@ class MainWindow(QMainWindow):
         items = [i for i in items if self._confirm_overwrite_download(i)]
         if not items:
             return
+        self._overwrite_all = False
         self.manager.enqueue(items)
         total = sum(int(i.size or 0) for i in items)
         self.log("info", "Queued %d item(s) for download (%s)"
@@ -1058,6 +1071,8 @@ class MainWindow(QMainWindow):
             return True
         if not self.settings.get("behavior", "confirm_overwrite", True):
             return True
+        if self._overwrite_all:
+            return True
         remote = self._remote_join(item.display_name)
         try:
             exists = remote in [e.name for e in self.session.listdir()]
@@ -1066,12 +1081,17 @@ class MainWindow(QMainWindow):
         if not exists:
             return True
         answer = QMessageBox.question(
-            self, "Overwrite?",
-            "“%s” already exists on the server.\n\nOverwrite it?" % remote,
+            self, T("Overwrite?"),
+            "%s\n\n%s" % (T("“%s” already exists on the server.") % remote,
+                          T("Overwrite it?")),
             QMessageBox.Yes | QMessageBox.No | QMessageBox.YesToAll,
             QMessageBox.Yes)
         if answer == QMessageBox.YesToAll:
-            self.settings.set("behavior", "confirm_overwrite", False)
+            # applies to the rest of THIS batch only: switching the preference
+            # off for good would silently overwrite later on
+            self._overwrite_all = True
+            self.status.showMessage(T("Overwriting without asking for the rest "
+                                      "of this batch"), 5000)
             return True
         return answer == QMessageBox.Yes
 
@@ -1087,13 +1107,18 @@ class MainWindow(QMainWindow):
             return True
         if not self.settings.get("behavior", "confirm_overwrite", True):
             return True
+        if self._overwrite_all:
+            return True
         answer = QMessageBox.question(
-            self, "Overwrite?",
-            "“%s” already exists locally.\n\nOverwrite it?" % item.target,
+            self, T("Overwrite?"),
+            "%s\n\n%s" % (T("“%s” already exists locally.") % item.target,
+                          T("Overwrite it?")),
             QMessageBox.Yes | QMessageBox.No | QMessageBox.YesToAll,
             QMessageBox.Yes)
         if answer == QMessageBox.YesToAll:
-            self.settings.set("behavior", "confirm_overwrite", False)
+            self._overwrite_all = True
+            self.status.showMessage(T("Overwriting without asking for the rest "
+                                      "of this batch"), 5000)
             return True
         return answer == QMessageBox.Yes
 
@@ -1608,8 +1633,23 @@ class MainWindow(QMainWindow):
             self.status.showMessage(T("Remote path copied"), 3000)
 
     def swap_panes(self) -> None:
-        sizes = self.site_splitter.sizes()
-        self.site_splitter.setSizes([sizes[1], sizes[0]])
+        """Exchange the two panes left-for-left, keeping their own widths.
+
+        Only reversing the splitter widths is a no-op when both panes are the
+        same size, which is the default - so the widgets themselves are moved.
+        """
+        splitter = self.site_splitter
+        if splitter.count() < 2:
+            return
+        left, right = splitter.widget(0), splitter.widget(1)
+        left_width, right_width = splitter.sizes()
+        left.setParent(None)
+        right.setParent(None)
+        # re-insert in the opposite order, carrying each pane's width with it
+        splitter.insertWidget(0, right)
+        splitter.insertWidget(1, left)
+        splitter.setSizes([right_width, left_width])
+        splitter.widget(0).setFocus()
         self.status.showMessage(T("Panes swapped"), 2500)
 
     def clear_log(self) -> None:

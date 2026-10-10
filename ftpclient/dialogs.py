@@ -19,15 +19,46 @@ from PyQt5.QtWidgets import (QAbstractItemView, QCheckBox, QColorDialog,
 
 from . import config as _config
 from . import session as _session
-from .i18n import LANGUAGE_NAMES, T, i18n
+from .i18n import LANGUAGE_NAMES, T, i18n, localise_box
 from .widgets import LogView, PathBar
+
+
+class _LocalisedButtons(object):
+    """Keeps a dialog's standard buttons in the active language.
+
+    Qt fills ``QDialogButtonBox`` with its own English labels, and a dialog can
+    outlive a language change (the preferences dialog reopens itself when the
+    language switches), so the buttons are refreshed both when the dialog is
+    shown and whenever the language changes.
+    """
+
+    def _watch_buttons(self) -> None:
+        try:
+            i18n.changed.connect(self._retranslate_buttons)
+        except Exception:
+            pass
+
+    def _retranslate_buttons(self) -> None:
+        from PyQt5.QtWidgets import QDialogButtonBox
+        for box in self.findChildren(QDialogButtonBox):
+            localise_box(box)
+        # a dialog may rename a standard button (e.g. Ok -> "Connect"), so give
+        # it a chance to re-apply that label in the new language
+        self._apply_custom_button_text()
+
+    def _apply_custom_button_text(self) -> None:
+        """Hook for dialogs that rename a standard button. No-op by default."""
+
+    def showEvent(self, event: Any) -> None:
+        self._retranslate_buttons()
+        super(_LocalisedButtons, self).showEvent(event)
 
 
 # ---------------------------------------------------------------------------
 # Connect dialog
 # ---------------------------------------------------------------------------
 
-class ConnectDialog(QDialog):
+class ConnectDialog(_LocalisedButtons, QDialog):
     """Collects the parameters for one connection."""
 
     def __init__(self, settings: Any, parent: QWidget = None,
@@ -166,12 +197,22 @@ class ConnectDialog(QDialog):
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
+        self._buttons = buttons
 
         self._apply_values(values)
         self._on_protocol()
+        self._watch_buttons()
+        self._retranslate_buttons()
         self.host.setFocus()
 
     # -- helpers --------------------------------------------------------
+    def _apply_custom_button_text(self) -> None:
+        """The OK button here reads "Connect" instead."""
+        try:
+            self._buttons.button(QDialogButtonBox.Ok).setText(T("Connect"))
+        except (AttributeError, RuntimeError):
+            pass
+
     def _on_name_edited(self, _text: str) -> None:
         self._name_touched = True
 
@@ -304,7 +345,7 @@ class ConnectDialog(QDialog):
 # Site manager
 # ---------------------------------------------------------------------------
 
-class SiteManagerDialog(QDialog):
+class SiteManagerDialog(_LocalisedButtons, QDialog):
     """Lists, renames and deletes the connections stored in ``config.ini``."""
 
     def __init__(self, settings: Any, parent: QWidget = None) -> None:
@@ -447,7 +488,7 @@ class ColorTable(QTableWidget):
         self.verticalHeader().setDefaultSectionSize(30)
 
 
-class PreferencesDialog(QDialog):
+class PreferencesDialog(_LocalisedButtons, QDialog):
     """Appearance (including every colour), transfers and connection settings."""
 
     palette_preview = pyqtSignal(dict)
@@ -499,6 +540,8 @@ class PreferencesDialog(QDialog):
         outer.addWidget(buttons)
 
         self._load_values()
+        self._watch_buttons()
+        self._retranslate_buttons()
 
     # -- page scaffolding ----------------------------------------------
     def _add_page(self, title: str, widget: QWidget) -> None:
@@ -578,8 +621,88 @@ class PreferencesDialog(QDialog):
         startup_form.addRow(T("Log lines kept"), self.log_lines)
         startup.setLayout(startup_form)
         layout.addWidget(startup)
+
+        # -- where the settings and saved connections actually live ---------
+        files = QGroupBox(T("Configuration files"), page)
+        files_form = self._form()
+        self.config_path_label = QLabel(self._config_folder(), files)
+        self.config_path_label.setObjectName("Hint")
+        self.config_path_label.setWordWrap(True)
+        self.config_path_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        files_form.addRow(T("Folder"), self.config_path_label)
+
+        open_folder = QPushButton(T("Open the configuration folder"), files)
+        open_folder.clicked.connect(self._open_config_folder)
+        open_ini = QPushButton(T("Edit the saved connections (config.ini)"), files)
+        open_ini.clicked.connect(self._open_config_file)
+        button_row = QWidget(files)
+        button_layout = QHBoxLayout(button_row)
+        button_layout.setContentsMargins(0, 0, 0, 0)
+        button_layout.setSpacing(6)
+        button_layout.addWidget(open_folder)
+        button_layout.addWidget(open_ini)
+        button_layout.addStretch(1)
+        files_form.addRow("", button_row)
+
+        note = QLabel(T("Connections are stored in config.ini inside this "
+                        "folder. Passwords are kept in clear text, so treat "
+                        "the file like a password list."), files)
+        note.setObjectName("Hint")
+        note.setWordWrap(True)
+        files_form.addRow("", note)
+        files.setLayout(files_form)
+        layout.addWidget(files)
+
         layout.addStretch(1)
         return page
+
+    # -- configuration folder helpers -----------------------------------
+    @staticmethod
+    def _config_folder() -> str:
+        """The folder holding settings.json and config.ini."""
+        try:
+            from . import config as _config
+            return os.path.dirname(os.path.abspath(
+                _config.default_settings_path()))
+        except Exception:
+            return ""
+
+    def _open_config_folder(self) -> None:
+        from .manual import open_with_system
+        folder = self._config_folder()
+        if not folder:
+            return
+        try:
+            # make sure the folder exists before asking Explorer to show it
+            if not os.path.isdir(folder):
+                os.makedirs(folder)
+        except OSError:
+            pass
+        if not open_with_system(folder):
+            QMessageBox.warning(
+                self, T("Configuration files"),
+                T("Could not open %s") % folder)
+
+    def _open_config_file(self) -> None:
+        """Open config.ini, creating an empty one if it is missing."""
+        from . import config as _config
+        from .manual import open_with_system
+        path = _config.default_config_path()
+        try:
+            if not os.path.isfile(path):
+                parent = os.path.dirname(os.path.abspath(path))
+                if parent and not os.path.isdir(parent):
+                    os.makedirs(parent)
+                with open(path, "w", encoding="utf-8") as handle:
+                    handle.write("; Nacre FTP saved connections\n")
+        except OSError as exc:
+            QMessageBox.warning(self, T("Configuration files"),
+                                T("Could not open %s") % path)
+            return
+        if not open_with_system(path):
+            QMessageBox.warning(
+                self, T("Configuration files"),
+                T("Could not open %s") % path)
 
     def _on_language_changed(self) -> None:
         """Apply the new language straight away, then rebuild this dialog."""

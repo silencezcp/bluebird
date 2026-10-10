@@ -490,9 +490,12 @@ class FileListModel(QAbstractTableModel):
 # Transfer queue model
 # ---------------------------------------------------------------------------
 
-XFER_NAME, XFER_DIRECTION, XFER_SIZE, XFER_PROGRESS, XFER_SPEED, XFER_STATUS = range(6)
+#: Transfer queue columns.  Time comes first: it answers "when did this run?",
+#: which is the first thing you look for in a transfer log.
+XFER_TIME, XFER_NAME, XFER_DIRECTION, XFER_SIZE, XFER_PROGRESS, \
+    XFER_SPEED, XFER_STATUS = range(7)
 
-TRANSFER_COLUMNS: List[str] = ["File", "Direction", "Size", "Progress",
+TRANSFER_COLUMNS: List[str] = ["Time", "File", "Direction", "Size", "Progress",
                                "Speed", "Status"]
 
 
@@ -503,8 +506,8 @@ class TransferItem(object):
 
     __slots__ = ("uid", "kind", "source", "target", "size", "transferred",
                  "status", "message", "speed", "started_at", "finished_at",
-                 "retries", "remote_dir", "local_dir", "override_name",
-                 "is_dir", "expanded")
+                 "created_at", "retries", "remote_dir", "local_dir",
+                 "override_name", "is_dir", "expanded")
 
     def __init__(self, kind: str, source: str, target: str,
                  size: Optional[int] = None, is_dir: bool = False) -> None:
@@ -519,6 +522,9 @@ class TransferItem(object):
         self.speed = 0.0
         self.started_at = 0.0
         self.finished_at = 0.0
+        #: set when the item is queued, so the Time column can show something
+        #: while a transfer is still waiting its turn
+        self.created_at = time.time()
         self.retries = 0
         self.remote_dir = ""
         self.local_dir = ""
@@ -547,6 +553,21 @@ class TransferItem(object):
             return 0
         value = int(self.transferred * 100 / float(self.size))
         return max(0, min(100, value))
+
+    def time_text(self) -> str:
+        """Hours:minutes:seconds for the Time column.
+
+        A queued item shows the moment it entered the queue, so the column is
+        never blank; once the transfer starts the timestamp is pinned to the
+        start time and stays put for the life of the row.
+        """
+        when = self.started_at or self.created_at
+        if not when:
+            return ""
+        try:
+            return time.strftime("%H:%M:%S", time.localtime(when))
+        except (ValueError, OSError, OverflowError):
+            return ""
 
     def kind_label(self) -> str:
         from .i18n import T
@@ -679,6 +700,8 @@ class TransferModel(QAbstractTableModel):
             return None
         column = index.column()
         if role == Qt.DisplayRole:
+            if column == XFER_TIME:
+                return item.time_text()
             if column == XFER_NAME:
                 return item.display_name
             if column == XFER_DIRECTION:

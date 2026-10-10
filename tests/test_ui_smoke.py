@@ -532,7 +532,27 @@ def main():
           all("Delegate" in name for name in delegate_names),
           str(delegate_names))
     check("the Progress column keeps its own delegate",
-          isinstance(queue_table.itemDelegateForColumn(3), ProgressDelegate))
+          isinstance(queue_table.itemDelegateForColumn(4), ProgressDelegate))
+    # the Time column shows hours:minutes:seconds, never blank
+    from ftpclient.models import TransferItem as _TI
+    _timed = _TI("download", "/remote/x.bin", os.path.join(local_dir, "x.bin"),
+                 size=100)
+    import re as _re
+    _time_text = _timed.time_text()
+    check("the queue time is HH:MM:SS",
+          len(_time_text) == 8 and _time_text[2] == ":" and _time_text[5] == ":"
+          and _time_text.replace(":", "").isdigit(), _time_text)
+    _timed.started_at = _timed.created_at - 3661
+    check("the timestamp pins to the start when the transfer begins",
+          _timed.time_text() != "", _timed.time_text())
+    check("the time column is the first column",
+          window.queue_panel.model.headerData(0, Qt.Horizontal) in ("Time",
+                                                                    "时间"),
+          str(window.queue_panel.model.headerData(0, Qt.Horizontal)))
+    check("the first transfers column is the time",
+          window.queue_panel.model.headerData(0, Qt.Horizontal) in ("Time",
+                                                                    "时间"),
+          str(window.queue_panel.model.headerData(0, Qt.Horizontal)))
     # the separator must actually stand out from the surface behind it
     surface = theme.color("surface")
     rule = theme.color("gridline")
@@ -747,8 +767,11 @@ def main():
     check("Chinese type label",
           window.local_pane.model.headerData(2, Qt.Horizontal) == "类型")
     check("Chinese queue header",
-          window.queue_panel.model.headerData(1, Qt.Horizontal) == "方向",
-          str(window.queue_panel.model.headerData(1, Qt.Horizontal)))
+          window.queue_panel.model.headerData(2, Qt.Horizontal) == "方向",
+          str(window.queue_panel.model.headerData(2, Qt.Horizontal)))
+    check("Chinese time column header",
+          window.queue_panel.model.headerData(0, Qt.Horizontal) == "时间",
+          str(window.queue_panel.model.headerData(0, Qt.Horizontal)))
     check("Chinese placeholder",
           window.name_edit.placeholderText() == "连接名",
           window.name_edit.placeholderText())
@@ -759,6 +782,137 @@ def main():
     check("language preference is stored",
           settings.get("appearance", "language") == "zh",
           str(settings.get("appearance", "language")))
+
+    print("\n-- the right-click menu follows the language --")
+    # the menu is built on demand, so it must be translated too (it used to
+    # show raw English strings while the rest of the UI was Chinese)
+    local_menu = window.build_context_menu(window.local_pane)
+    local_labels = [a.text() for a in local_menu.actions() if a.text()]
+    check("the local context menu has entries", bool(local_labels),
+          str(local_labels))
+    check("no raw English left in the local menu",
+          not any(label in ("Create folder…", "Refresh", "Rename…", "Delete",
+                            "Properties", "Upload to the server")
+                  for label in local_labels), str(local_labels))
+    check("the local menu is translated",
+          any("新建文件夹" in label for label in local_labels)
+          and any("刷新" in label for label in local_labels),
+          str(local_labels))
+    # with a row selected the action items appear, still translated
+    if window.local_pane.model.rowCount():
+        window.local_pane.table.selectRow(0)
+        app.processEvents()
+        selected_labels = [a.text() for a
+                           in window.build_context_menu(
+                               window.local_pane).actions() if a.text()]
+        check("a selected row adds translated actions",
+              any("删除" in label or "重命名" in label
+                  for label in selected_labels), str(selected_labels))
+        check("no raw English with a row selected",
+              not any(label in ("Delete", "Rename…", "Properties",
+                                "Upload to the server")
+                      for label in selected_labels), str(selected_labels))
+        window.local_pane.table.clearSelection()
+        app.processEvents()
+
+    remote_menu = window.build_context_menu(window.remote_pane)
+    remote_labels = [a.text() for a in remote_menu.actions() if a.text()]
+    check("no raw English left in the remote menu",
+          not any(label in ("Download to the local folder", "Create directory…",
+                            "Create empty file…", "Refresh", "Edit",
+                            "Rename…", "Delete", "Permissions…", "Properties",
+                            "Calculate folder size")
+                  for label in remote_labels), str(remote_labels))
+    if window.session is None or not window.session.connected:
+        check("the disconnected remote menu still translates its entries",
+              any("新建目录" in label for label in remote_labels)
+              or not remote_labels, str(remote_labels))
+
+    I18N.set_language("en", notify=True)
+    english_menu = [a.text() for a
+                    in window.build_context_menu(window.local_pane).actions()
+                    if a.text()]
+    check("the context menu is English again after switching",
+          any(label == "Refresh" for label in english_menu), str(english_menu))
+    I18N.set_language("zh", notify=True)
+
+    print("\n-- swap the two panes --")
+    splitter = window.site_splitter
+    check("the splitter holds both panes", splitter.count() == 2,
+          str(splitter.count()))
+    before_order = [("local" if w is window.local_pane else "remote")
+                    for w in (splitter.widget(0), splitter.widget(1))]
+    check("local is on the left initially", before_order == ["local", "remote"],
+          str(before_order))
+    local_path_before = window.local_pane.path
+    window.swap_panes()
+    app.processEvents()
+    after_order = [("local" if w is window.local_pane else "remote")
+                   for w in (splitter.widget(0), splitter.widget(1))]
+    check("swapping really reverses the pane order",
+          after_order == ["remote", "local"], str(after_order))
+    check("the panes keep their identity",
+          window.local_pane.local and not window.remote_pane.local)
+    check("the local pane keeps its directory",
+          window.local_pane.path == local_path_before,
+          "%s -> %s" % (local_path_before, window.local_pane.path))
+    window.swap_panes()
+    app.processEvents()
+    check("swapping twice restores the original order",
+          [("local" if w is window.local_pane else "remote")
+           for w in (splitter.widget(0), splitter.widget(1))]
+          == ["local", "remote"])
+
+    print("\n-- overwrite confirmation --")
+    # "Yes to all" must only silence the rest of THAT batch: it used to write
+    # confirm_overwrite=False into the settings, silently overwriting forever
+    settings.set("behavior", "confirm_overwrite", True, autosave=False)
+    window._overwrite_all = False
+    item = TransferItem("download", "/remote/a.txt", os.path.join(local_dir, "overwrite-me.txt"),
+                        size=10)
+    asked = []
+    original_question = QMessageBox.question
+    QMessageBox.question = staticmethod(
+        lambda *args, **kwargs: (asked.append(args[2] if len(args) > 2 else ""),
+                                 QMessageBox.YesToAll)[1])
+    try:
+        os.makedirs(local_dir, exist_ok=True)
+        with open(os.path.join(local_dir, "overwrite-me.txt"), "w", encoding="utf-8") as handle:
+            handle.write("existing")
+        check("an existing local file triggers the prompt",
+              window._confirm_overwrite_download(item) is True)
+        check("the prompt was shown once", len(asked) == 1, str(len(asked)))
+        check("the prompt is translated",
+              "本地已存在" in asked[0] and "是否覆盖" in asked[0],
+              asked[0].replace("\n", " / "))
+        check("Yes-to-all does NOT change the preference",
+              settings.get("behavior", "confirm_overwrite", True) is True)
+        check("Yes-to-all only applies to the current batch",
+              window._overwrite_all is True)
+        # a second item in the same batch is not asked about again
+        window._confirm_overwrite_download(item)
+        check("the rest of the batch is not asked again", len(asked) == 1,
+              str(len(asked)))
+        # the flag is reset when a new batch is queued
+        window._overwrite_all = False
+        check("a new batch asks again",
+              window._confirm_overwrite_download(item) is True
+              and len(asked) == 2, str(len(asked)))
+        # with the preference off nothing is asked
+        settings.set("behavior", "confirm_overwrite", False, autosave=False)
+        window._overwrite_all = False
+        window._confirm_overwrite_download(item)
+        check("with the preference off nothing is asked", len(asked) == 2,
+              str(len(asked)))
+        # a file that does not exist yet is never asked about
+        settings.set("behavior", "confirm_overwrite", True, autosave=False)
+        fresh = TransferItem("download", "/remote/new.txt",
+                             os.path.join(local_dir, "brand-new.txt"), size=5)
+        window._confirm_overwrite_download(fresh)
+        check("a new file is not asked about", len(asked) == 2, str(len(asked)))
+    finally:
+        QMessageBox.question = original_question
+        settings.set("behavior", "confirm_overwrite", True, autosave=False)
 
     print("\n-- missing translations --")
     from ftpclient.i18n import ZH
@@ -802,6 +956,20 @@ def main():
     check("preferences has colour rows", prefs.color_table.rowCount() >= 25,
           str(prefs.color_table.rowCount()))
     check("preferences pages", prefs.stack.count() == 5, str(prefs.stack.count()))
+    # the General page must offer a way to reach the configuration folder,
+    # otherwise the files are impossible to find
+    from PyQt5.QtWidgets import QPushButton as _QPushButton
+    buttons = [b.text() for b in prefs.findChildren(_QPushButton)]
+    check("preferences can open the configuration folder",
+          any("配置文件夹" in text for text in buttons), str(buttons))
+    check("preferences can edit config.ini",
+          any("config.ini" in text for text in buttons), str(buttons))
+    check("the configuration folder is named",
+          os.path.isdir(prefs._config_folder())
+          or bool(prefs._config_folder()), prefs._config_folder())
+    check("the configuration folder label shows the path",
+          prefs.config_path_label.text() == prefs._config_folder(),
+          prefs.config_path_label.text())
     previews = []
     prefs.palette_preview.connect(lambda p: previews.append(p))
     prefs._set_color("folder", "#336699")

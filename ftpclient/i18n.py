@@ -497,6 +497,16 @@ ZH: Dict[str, str] = {
     "“%s” already exists on the server.": "服务器上已存在“%s”。",
     "Overwrite it?": "是否覆盖？",
     "“%s” already exists locally.": "本地已存在“%s”。",
+    "Overwriting without asking for the rest of this batch":
+        "本批次剩余文件将直接覆盖，不再询问",
+    "Time": "时间",
+    "Configuration files": "配置文件",
+    "Open the configuration folder": "打开配置文件夹",
+    "Edit the saved connections (config.ini)": "编辑已保存的连接（config.ini）",
+    "Connections are stored in config.ini inside this folder. Passwords are "
+    "kept in clear text, so treat the file like a password list.":
+        "连接信息保存在此文件夹下的 config.ini 中。密码为明文存储，"
+        "请把该文件当作密码清单妥善保管。",
     "Delete %d item(s) from this computer?": "要从本机删除 %d 项吗？",
     "Delete %d item(s) on the server?": "要在服务器上删除 %d 项吗？",
     "Octal mode for “%s”:": "“%s”的八进制权限：",
@@ -556,14 +566,41 @@ BUTTON_TEXTS = [
     ("Abort", "Abort"), ("Retry", "Retry"), ("Ignore", "Ignore"),
 ]
 
+#: the same idea for QDialogButtonBox, using its own enum names
+DIALOG_BUTTON_TEXTS = [
+    ("Ok", "OK"), ("Cancel", "Cancel"), ("Apply", "Apply"),
+    ("Close", "Close"), ("Save", "Save"), ("Discard", "Discard"),
+    ("Reset", "Reset"), ("Help", "Help"), ("Yes", "&Yes"), ("No", "&No"),
+    ("YesToAll", "Yes to &All"), ("NoToAll", "N&o to All"),
+    ("Retry", "Retry"), ("Abort", "Abort"), ("Ignore", "Ignore"),
+    ("Open", "Open"),
+]
+
 
 def localise_box(box: Any) -> None:
-    """Translate a QMessageBox's standard buttons and its details toggle."""
+    """Translate a QMessageBox's standard buttons and its details toggle.
+
+    Also handles a ``QDialogButtonBox``: Qt fills those with its own English
+    strings, so without this the OK / Cancel / Apply buttons of the
+    preferences and connect dialogs stay English while everything around them
+    is translated.
+    """
     try:
-        from PyQt5.QtWidgets import QMessageBox
+        from PyQt5.QtWidgets import QDialogButtonBox, QMessageBox
     except ImportError:      # pragma: no cover
         return
     try:
+        if isinstance(box, QDialogButtonBox):
+            for name, english in DIALOG_BUTTON_TEXTS:
+                flag = getattr(QDialogButtonBox, name, None)
+                if flag is None:
+                    continue
+                button = box.button(flag)
+                if button is not None:
+                    # always rewrite: T() returns the English text when English
+                    # is active, which is what makes switching back work
+                    button.setText(T(english))
+            return
         for name, english in BUTTON_TEXTS:
             flag = getattr(QMessageBox, name, None)
             if flag is None:
