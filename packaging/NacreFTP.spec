@@ -1,0 +1,169 @@
+# -*- mode: python ; coding: utf-8 -*-
+"""PyInstaller spec for Nacre FTP (one-folder build).
+
+Build with::
+
+    D:\\DSH_Workspaces\\Ftp\\python.exe -m PyInstaller --clean --noconfirm ^
+        packaging\\NacreFTP.spec
+
+Output: ``dist/NacreFTP/NacreFTP.exe`` plus ``dist/NacreFTP/docs``.
+
+A one-folder build is used on purpose:
+
+* it starts instantly (a one-file build unpacks ~200 MB on every launch),
+* ``docs/`` lands **beside** the exe, so the user manual can be replaced
+  without rebuilding - :mod:`ftpclient.resources` looks there as well.
+
+The QtWebEngine runtime is required by the in-app manual, so it is bundled
+rather than trimmed.
+"""
+
+import os
+
+ROOT = os.path.abspath(os.path.join(SPECPATH, os.pardir))
+DOCS = os.path.join(ROOT, "docs")
+
+# ---------------------------------------------------------------------------
+# data files that are visible next to the executable
+# ---------------------------------------------------------------------------
+datas = []
+
+for name in ("\u7528\u6237\u624b\u518c.html", "\u7528\u6237\u624b\u518c.md",
+             "\u7528\u6237\u624b\u518c.pdf"):
+    path = os.path.join(DOCS, name)
+    if os.path.isfile(path):
+        datas.append((path, "docs"))
+
+shots = os.path.join(DOCS, "screenshots")
+if os.path.isdir(shots):
+    datas.append((shots, "docs/screenshots"))
+
+for name in ("README.md", "requirements.txt"):
+    path = os.path.join(ROOT, name)
+    if os.path.isfile(path):
+        datas.append((path, "."))
+
+# ---------------------------------------------------------------------------
+# modules the static analysis cannot always see
+# ---------------------------------------------------------------------------
+hiddenimports = [
+    "paramiko",
+    "paramiko.ed25519key",
+    "paramiko.ecdsakey",
+    "PyQt5.QtSvg",
+    "PyQt5.QtPrintSupport",
+    "PyQt5.QtWebChannel",
+    "PyQt5.QtWebEngineCore",
+    "PyQt5.QtWebEngineWidgets",
+]
+
+# ---------------------------------------------------------------------------
+# trim what the client never uses (keeps the bundle ~80 MB smaller)
+# ---------------------------------------------------------------------------
+excludes = [
+    "pyftpdlib",          # test-only FTP server
+    "tkinter",
+    "unittest",
+    "pydoc_data",
+    "matplotlib", "numpy", "pandas", "scipy", "PIL", "IPython",
+    "PyQt5.QtBluetooth", "PyQt5.QtDesigner", "PyQt5.QtHelp",
+    "PyQt5.QtMultimedia", "PyQt5.QtMultimediaWidgets", "PyQt5.QtNfc",
+    "PyQt5.QtOpenGL", "PyQt5.QtPositioning", "PyQt5.QtSql",
+    "PyQt5.QtTest", "PyQt5.QtXmlPatterns", "PyQt5.QtSensors",
+    "PyQt5.QtSerialPort", "PyQt5.QtWebSockets", "PyQt5.QtLocation",
+]
+
+a = Analysis(
+    [os.path.join(ROOT, "run.py")],
+    pathex=[ROOT],
+    binaries=[],
+    datas=datas,
+    hiddenimports=hiddenimports,
+    hookspath=[],
+    hooksconfig={},
+    runtime_hooks=[],
+    excludes=excludes,
+    win_no_prefer_redirects=False,
+    win_private_assemblies=False,
+    cipher=None,
+    noarchive=False,
+)
+
+# ---------------------------------------------------------------------------
+# trim files the bundle does not need (~45 MB).  The app localises its own
+# strings, so Qt's translation catalogues are dead weight; the Qt3D / Sensors /
+# Location QML modules are never loaded by the manual viewer.  QtWebEngine
+# itself (97 MB) and the software OpenGL fallback are kept on purpose.
+# ---------------------------------------------------------------------------
+TRIM_PREFIXES = (
+    "PyQt5\\Qt5\\translations\\",
+    "PyQt5\\Qt5\\qml\\Qt3D",
+    "PyQt5\\Qt5\\qml\\QtSensors",
+    "PyQt5\\Qt5\\qml\\QtLocation",
+    "PyQt5\\Qt5\\qml\\QtPositioning",
+    "PyQt5\\Qt5\\qml\\QtCharts",
+    "PyQt5\\Qt5\\qml\\QtDataVisualization",
+    "PyQt5\\Qt5\\qml\\QtPurchasing",
+)
+
+#: (path fragment, description) for log lines such as "lib not found: ..."
+TRIM_SUBSTRINGS = ("qtquickscene2dplugin", "qtquickscene3dplugin")
+
+
+def _keep(entry):
+    """True when the collected file should stay in the bundle."""
+    name = str(entry[0])
+    normalised = name.replace("/", "\\")
+    for prefix in TRIM_PREFIXES:
+        if normalised.startswith(prefix):
+            return False
+    lowered = normalised.lower()
+    for fragment in TRIM_SUBSTRINGS:
+        if fragment in lowered:
+            return False
+    return True
+
+
+_before = len(a.binaries) + len(a.datas)
+# In PyInstaller 5 these are plain lists; keep it that way for compatibility.
+a.binaries = [item for item in a.binaries if _keep(item)]
+a.datas = [item for item in a.datas if _keep(item)]
+_after = len(a.binaries) + len(a.datas)
+print("NacreFTP build: trimmed %d of %d collected files"
+      % (_before - _after, _before))
+
+pyz = PYZ(a.pure, a.zipped_data, cipher=None)
+
+exe = EXE(
+    pyz,
+    a.scripts,
+    [],
+    exclude_binaries=True,
+    name="NacreFTP",
+    debug=False,
+    bootloader_ignore_signals=False,
+    strip=False,
+    # UPX corrupts several Qt DLLs, so it stays off
+    upx=False,
+    console=False,
+    disable_windowed_traceback=False,
+    argv_emulation=False,
+    target_arch=None,
+    codesign_identity=None,
+    entitlements_file=None,
+    icon=os.path.join(ROOT, "packaging", "nacreftp.ico")
+    if os.path.isfile(os.path.join(ROOT, "packaging", "nacreftp.ico")) else None,
+    version=os.path.join(ROOT, "packaging", "version_info.txt")
+    if os.path.isfile(os.path.join(ROOT, "packaging", "version_info.txt")) else None,
+)
+
+coll = COLLECT(
+    exe,
+    a.binaries,
+    a.zipfiles,
+    a.datas,
+    strip=False,
+    upx=False,
+    upx_exclude=[],
+    name="NacreFTP",
+)
