@@ -77,6 +77,54 @@ def main():
         check("file not a dir",
               by_name.get("readme.txt") and not by_name["readme.txt"].is_dir)
 
+        print("\n-- remote permissions --")
+        # pyftpdlib answers MLSD without unix.mode, so the Permissions column
+        # has to be filled from the RFC 3659 perm fact instead of staying blank
+        file_entry = by_name.get("readme.txt")
+        check("a remote file reports permissions",
+              bool(file_entry and file_entry.permissions),
+              file_entry.permissions if file_entry else "no entry")
+        check("a file's permissions start with '-'",
+              bool(file_entry and file_entry.permissions.startswith("-")),
+              file_entry.permissions if file_entry else "")
+        check("a remote folder reports permissions",
+              bool(by_name.get("docs") and by_name["docs"].permissions),
+              by_name["docs"].permissions if by_name.get("docs") else "")
+        check("a folder's permissions start with 'd'",
+              bool(by_name.get("docs")
+                   and by_name["docs"].permissions.startswith("d")),
+              by_name["docs"].permissions if by_name.get("docs") else "")
+        check("the raw MLSD perm fact is kept for the tooltip",
+              bool(file_entry and file_entry.extra.get("mlsd_perm")),
+              str(file_entry.extra) if file_entry else "")
+        check("the perm fact is spelled out for humans",
+              "read" in S.describe_mlsd_perm("radfwMT")
+              and "write" in S.describe_mlsd_perm("radfwMT"),
+              S.describe_mlsd_perm("radfwMT"))
+        check("M and T are not described twice",
+              S.describe_mlsd_perm("MT").count("last-modified") == 1,
+              S.describe_mlsd_perm("MT"))
+
+        # a server that does send unix.mode must produce a real mode string
+        class _FakeFTP(object):
+            def retrlines(self, command, callback):
+                for line in ("type=file;size=10;unix.mode=0644;"
+                             "modify=20260101120000; a.txt",
+                             "type=dir;unix.mode=0755;"
+                             "modify=20260101120000; sub"):
+                    callback(line)
+
+        parsed = ftp._list_mlsd(_FakeFTP())
+        modes = {e.name: e.permissions for e in parsed}
+        check("unix.mode becomes a readable file mode",
+              modes.get("a.txt") == "-rw-r--r--", str(modes))
+        check("unix.mode becomes a readable folder mode",
+              modes.get("sub") == "drwxr-xr-x", str(modes))
+        check("octal parsing rejects junk", S._mode_from_octal("zz") is None)
+        check("octal parsing accepts the 0o prefix",
+              S._mode_from_octal("0o644") == 0o644,
+              str(S._mode_from_octal("0o644")))
+
         print("\n-- navigation --")
         cwd = ftp.chdir("docs")
         check("chdir docs", cwd.rstrip("/").endswith("docs"), cwd)

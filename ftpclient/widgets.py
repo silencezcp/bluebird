@@ -245,6 +245,67 @@ class PathBar(QFrame):
 # File table
 # ---------------------------------------------------------------------------
 
+def draw_column_separators(painter: Any, option: Any, index: QModelIndex,
+                           color: Any, margin: int = 0) -> None:
+    """Draw thin vertical rules at the column boundaries of one cell.
+
+    Qt's own grid lines are drawn uniformly and look heavy in a cream theme, so
+    the separators are painted here instead: a 1 px rule on the right and, for
+    the left-most column, on the left as well.  They are drawn on every row so
+    the columns stay readable all the way down, not just under the header.
+
+    ``margin`` insets the rule vertically (used by the transfers table so the
+    progress column does not look boxed in).
+    """
+    from PyQt5.QtCore import QRectF
+    from PyQt5.QtGui import QColor, QPen
+    if color is None:
+        return
+    rect = option.rect
+    if rect.width() <= 0 or rect.height() <= 0:
+        return
+    was_active = painter.isActive()
+    if not was_active:
+        painter.begin(option.widget)
+    painter.save()
+    pen = QPen(QColor(color))
+    pen.setWidth(1)
+    pen.setCosmetic(True)
+    painter.setPen(pen)
+    top = rect.top() + margin
+    bottom = rect.bottom() - margin
+    if bottom > top:
+        x = rect.right()
+        painter.drawLine(x, top, x, bottom)
+        if index.column() == 0:
+            painter.drawLine(rect.left(), top, rect.left(), bottom)
+    painter.restore()
+    if not was_active:
+        painter.end()
+
+
+class ColumnSeparatorDelegate(QStyledItemDelegate):
+    """A default delegate that adds crisp vertical column separators."""
+
+    def __init__(self, theme: Any, parent: QWidget = None,
+                 color_key: str = "gridline", margin: int = 0) -> None:
+        super(ColumnSeparatorDelegate, self).__init__(parent)
+        self._theme = theme
+        self._color_key = color_key
+        self._margin = margin
+        self._color = None
+
+    def refresh_colour(self) -> None:
+        self._color = self._theme.color(self._color_key, "border")
+
+    def paint(self, painter: Any, option: Any, index: QModelIndex) -> None:
+        super(ColumnSeparatorDelegate, self).paint(painter, option, index)
+        if self._color is None:
+            self.refresh_colour()
+        draw_column_separators(painter, option, index, self._color,
+                               self._margin)
+
+
 class FileTableView(QTableView):
     """A flat file list with drag & drop and a right-click menu hook."""
 
@@ -276,6 +337,17 @@ class FileTableView(QTableView):
         self.horizontalHeader().setHighlightSections(False)
         self.horizontalHeader().setStretchLastSection(False)
         self.setCornerButtonEnabled(False)
+        self._separators: Optional[ColumnSeparatorDelegate] = None
+
+    def attach_column_separators(self, theme: Any) -> None:
+        """Install the delegate that draws the vertical column separators."""
+        self._separators = ColumnSeparatorDelegate(theme, self, "gridline", 1)
+        self.setItemDelegate(self._separators)
+
+    def refresh_separator_colour(self) -> None:
+        if self._separators is not None:
+            self._separators.refresh_colour()
+            self.viewport().update()
 
     # -- sizing ---------------------------------------------------------
     def apply_theme(self, row_height: int, icon_size: int) -> None:
@@ -531,11 +603,15 @@ class PaneHeader(QFrame):
 # Progress delegate for the transfer table
 # ---------------------------------------------------------------------------
 
-class ProgressDelegate(QStyledItemDelegate):
-    """Draws a slim rounded progress bar inside the Progress column."""
+class ProgressDelegate(ColumnSeparatorDelegate):
+    """Draws a slim rounded progress bar inside the Progress column.
+
+    It also paints the column separators, so the Progress column lines up with
+    the rest of the table.
+    """
 
     def __init__(self, theme: Any, parent: QWidget = None) -> None:
-        super(ProgressDelegate, self).__init__(parent)
+        super(ProgressDelegate, self).__init__(theme, parent, "gridline", 2)
         self._theme = theme
 
     def paint(self, painter: Any, option: Any, index: QModelIndex) -> None:
@@ -545,11 +621,9 @@ class ProgressDelegate(QStyledItemDelegate):
         item = None
         if hasattr(model, "item_by_id") and item_id is not None:
             item = model.item_by_id(item_id)
-        if item is None:
+        if item is None or item.status != "active":
             super(ProgressDelegate, self).paint(painter, option, index)
-            return
-        if item.status != "active":
-            super(ProgressDelegate, self).paint(painter, option, index)
+            self._paint_separator(painter, option, index)
             return
         self.initStyleOption(option, index)
         style = option.widget.style() if option.widget else None
@@ -577,3 +651,12 @@ class ProgressDelegate(QStyledItemDelegate):
         painter.drawText(option.rect, Qt.AlignRight | Qt.AlignVCenter,
                          "%d%%  " % percent)
         painter.restore()
+        self._paint_separator(painter, option, index)
+
+    def _paint_separator(self, painter: Any, option: Any,
+                         index: QModelIndex) -> None:
+        """Keep the column separators aligned with the other delegates."""
+        if self._color is None:
+            self.refresh_colour()
+        draw_column_separators(painter, option, index, self._color,
+                               self._margin)

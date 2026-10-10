@@ -502,14 +502,47 @@ def main():
           header.sectionResizeMode(0) == QHeaderView.Interactive,
           str(header.sectionResizeMode(0)))
     # the right-most visible column absorbs the spare width so its values line
-    # up with the pane edge (Permissions / Owner are hidden by default)
+    # up with the pane edge.  Permissions is now shown by default, so the
+    # right-most visible column is Permissions (4) rather than Modified (3).
+    last_visible = max(c for c in range(header.count())
+                       if not window.local_pane.table.isColumnHidden(c))
     check("the last visible column is stretched",
-          header.sectionResizeMode(3) == QHeaderView.Stretch,
-          str(header.sectionResizeMode(3)))
+          header.sectionResizeMode(last_visible) == QHeaderView.Stretch,
+          "column %d -> %s" % (last_visible,
+                               header.sectionResizeMode(last_visible)))
+    check("Permissions is the right-most visible column by default",
+          last_visible == 4, "last visible = %d" % last_visible)
     check("columns before it stay user-resizable",
           all(header.sectionResizeMode(c) == QHeaderView.Interactive
               for c in (1, 2)),
           [int(header.sectionResizeMode(c)) for c in (1, 2)])
+
+    # column separators: the tables draw the rules themselves, so a delegate
+    # must be installed on every column and the colour must be visible
+    from ftpclient.widgets import (ColumnSeparatorDelegate,
+                                   ProgressDelegate)
+    pane_table = window.local_pane.table
+    check("the file panes use the separator delegate",
+          isinstance(pane_table.itemDelegate(), ColumnSeparatorDelegate),
+          type(pane_table.itemDelegate()).__name__)
+    queue_table = window.queue_panel.table
+    delegate_names = [type(queue_table.itemDelegateForColumn(c)).__name__
+                      for c in range(6)]
+    check("every transfers column has a separator delegate",
+          all("Delegate" in name for name in delegate_names),
+          str(delegate_names))
+    check("the Progress column keeps its own delegate",
+          isinstance(queue_table.itemDelegateForColumn(3), ProgressDelegate))
+    # the separator must actually stand out from the surface behind it
+    surface = theme.color("surface")
+    rule = theme.color("gridline")
+    check("the separator colour differs from the row background",
+          rule.upper() != surface.upper(), "%s vs %s" % (rule, surface))
+    check("the separator is darker than the background it sits on",
+          sum(int(rule[i:i + 2], 16) for i in (1, 3, 5))
+          < sum(int(surface[i:i + 2], 16) for i in (1, 3, 5)),
+          "%s vs %s" % (rule, surface))
+
     window.set_column_visible("permissions", True)
     check("showing Permissions moves the stretch to it",
           header.sectionResizeMode(4) == QHeaderView.Stretch

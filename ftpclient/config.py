@@ -42,7 +42,7 @@ DEFAULT_PALETTE: Dict[str, str] = {
     # --- lines ----------------------------------------------------------
     "border": "#E2D8C4",
     "border_strong": "#D2C4A9",
-    "gridline": "#EFE7D7",
+    "gridline": "#DCD2BC",
     # --- text -----------------------------------------------------------
     "text": "#3B352C",
     "text_muted": "#8A8072",
@@ -134,7 +134,7 @@ PRESETS: Dict[str, Optional[Dict[str, str]]] = {
         "window": "#F4F6F9", "surface": "#FFFFFF", "surface_alt": "#F8FAFC",
         "surface_sunken": "#EDF1F6", "surface_hover": "#EEF3F9",
         "sidebar": "#EEF2F7", "header": "#E9EEF5",
-        "border": "#DCE3EC", "border_strong": "#C6D0DD", "gridline": "#EDF1F6",
+        "border": "#DCE3EC", "border_strong": "#C6D0DD", "gridline": "#D3DDE9",
         "text": "#25303C", "text_muted": "#7C8899",
         "accent": "#2F6FB5", "accent_hover": "#3D80C8", "accent_pressed": "#255A94",
         "accent_soft": "#E4EEF8", "focus": "#7FA8CB",
@@ -146,7 +146,7 @@ PRESETS: Dict[str, Optional[Dict[str, str]]] = {
         "window": "#F3F6EE", "surface": "#FCFDF8", "surface_alt": "#F6F9F0",
         "surface_sunken": "#ECF1E3", "surface_hover": "#EDF3E2",
         "sidebar": "#EDF2E5", "header": "#E7EEDC",
-        "border": "#DAE2CD", "border_strong": "#C3CDB2", "gridline": "#EDF2E4",
+        "border": "#DAE2CD", "border_strong": "#C3CDB2", "gridline": "#D3DDC3",
         "text": "#31382A", "text_muted": "#7E8873",
         "accent": "#5C8A3C", "accent_hover": "#6C9C49", "accent_pressed": "#4A7130",
         "accent_soft": "#E8F0DF", "focus": "#9DBC7F",
@@ -158,7 +158,7 @@ PRESETS: Dict[str, Optional[Dict[str, str]]] = {
         "window": "#22201C", "surface": "#2A2724", "surface_alt": "#2F2B27",
         "surface_sunken": "#1E1C19", "surface_hover": "#3A352F",
         "sidebar": "#262320", "header": "#332F2A",
-        "border": "#3D3831", "border_strong": "#4E483F", "gridline": "#332F2A",
+        "border": "#3D3831", "border_strong": "#4E483F", "gridline": "#443E37",
         "text": "#EDE6D8", "text_muted": "#A79C89", "text_inverse": "#22201C",
         "accent": "#7FA8CB", "accent_hover": "#93B8D8", "accent_pressed": "#6A92B4",
         "accent_soft": "#33404B", "focus": "#7FA8CB",
@@ -227,9 +227,10 @@ DEFAULT_SETTINGS: Dict[str, Any] = {
         # pane). Turn auto-fit on to widen them to the longest name instead.
         "auto_fit_name_column": False,
         "column_widths": {"name": 260},
-        # Permissions / Owner are handy on Unix servers but cost ~190 px, so
-        # they start hidden and can be switched on from the View menu.
-        "show_permissions": False,
+        # Permissions / Owner are handy on Unix servers. Permissions is on by
+        # default because a remote listing is exactly where you need it; Owner
+        # costs another ~92 px and stays off until asked for.
+        "show_permissions": True,
         "show_owner": False,
     },
     "behavior": {

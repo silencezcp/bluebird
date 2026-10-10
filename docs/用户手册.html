@@ -286,9 +286,24 @@ run.cmd sftp://user@host:22/var/www        :: 直接进入指定目录</code></p
 </ul>
 <p>在盘符根目录按「上级」会弹出文件夹选择框（根目录已经没有上级了）。</p>
 <h3 id="53-文件列表">5.3 文件列表</h3>
-<table><thead><tr><th>列</th><th>含义</th></tr></thead><tbody><tr><td><strong>Name</strong></td><td>文件名，文件夹蓝色加粗，符号链接斜体青色</td></tr><tr><td><strong>Size</strong></td><td>大小，自动换算单位；文件夹显示 <code>&lt;DIR&gt;</code>；未知显示 <code>…</code></td></tr><tr><td><strong>Type</strong></td><td>类型（Folder / TXT file / ZIP file …）</td></tr><tr><td><strong>Modified</strong></td><td>修改时间</td></tr><tr><td>Permissions</td><td>权限（默认隐藏，View 菜单开启）</td></tr><tr><td>Owner</td><td>属主（默认隐藏，View 菜单开启）</td></tr></tbody></table>
+<table><thead><tr><th>列</th><th>含义</th></tr></thead><tbody><tr><td><strong>Name</strong></td><td>文件名，文件夹蓝色加粗，符号链接斜体青色</td></tr><tr><td><strong>Size</strong></td><td>大小，自动换算单位；文件夹显示 <code>&lt;DIR&gt;</code>；未知显示 <code>…</code></td></tr><tr><td><strong>Type</strong></td><td>类型（Folder / TXT file / ZIP file …）</td></tr><tr><td><strong>Modified</strong></td><td>修改时间</td></tr><tr><td><strong>Permissions</strong></td><td>权限（<strong>默认显示</strong>，可在 View 菜单关掉）</td></tr><tr><td>Owner</td><td>属主（默认隐藏，View 菜单开启）</td></tr></tbody></table>
 <p><strong>Name 列宽度是固定的</strong>：窗口放大或拖动分隔条都不会拉伸它，多余空间留在右侧。</p>
 <p>名字太长会显示 <code>…</code>，鼠标悬停可看完整名称与详情。</p>
+<p>列与列之间有<strong>细分隔线</strong>，从表头一直画到最下面一行，所以列很多时也能一眼看清</p>
+<p>每个值属于哪一列（颜色可在偏好设置里用 <code>Grid line</code> 单独调整）。</p>
+<h4 id="权限列的两种显示">权限列的两种显示</h4>
+<p>不同服务器给出的权限信息不同，本客户端会挑<strong>服务器真正提供的</strong>那种来显示，</p>
+<p>不会编造：</p>
+<table><thead><tr><th>服务器返回</th><th>显示样子</th><th>含义</th></tr></thead><tbody><tr><td>MLSD 带 <code>unix.mode</code>（ProFTPD、vsftpd 等）</td><td><code>-rw-r--r--</code>、<code>drwxr-xr-x</code></td><td>标准 Unix 权限位</td></tr><tr><td>LIST 的 <code>ls -l</code> 输出</td><td><code>-rw-r--r--</code>、<code>lrwxrwxrwx</code></td><td>标准 Unix 权限位</td></tr><tr><td>只有 MLSD 的 <code>perm</code> 事实（pyftpdlib、pure-ftpd、IIS 等）</td><td><code>-rawfdMT</code>、<code>delfdcmpMT</code></td><td><strong>当前账号被允许的操作</strong>，不是权限位</td></tr><tr><td>什么都没给</td><td>空白</td><td>服务器没有提供</td></tr></tbody></table>
+<p>第二种情况按 <strong>RFC 3659</strong> 定义显示，字母含义：</p>
+<p><code>e</code> 进入 · <code>l</code> 列出 · <code>r</code> 读取 · <code>a</code> 追加 · <code>w</code> 写入 · <code>f</code> 改名 ·</p>
+<p><code>d</code> 删除 · <code>c</code> 新建 · <code>m</code> 建目录 · <code>p</code> 删除目录内文件 · <code>M</code>/<code>T</code> 设置修改时间。</p>
+<p>首字母是类型：<code>-</code> 文件、<code>d</code> 目录、<code>l</code> 链接。</p>
+<blockquote>
+<p>为什么不做成 <code>-rw-r--r--</code> 的样子？因为 <code>perm</code> 描述的是<strong>你这份账号能做什么</strong>，</p>
+<p>而不是文件的权限位，硬套成 Unix 格式会是<strong>假信息</strong>。把鼠标悬停在文件上，</p>
+<p>提示框会把字母展开成单词（例如 <code>read, append, write, rename, delete</code>）。</p>
+</blockquote>
 <p>想改宽度：直接拖列边框，宽度会被记住。</p>
 <p>想让列宽按内容自适应：<strong>View ▸ Auto-fit the name column</strong>（默认关闭）。</p>
 <h3 id="54-排序与筛选">5.4 排序与筛选</h3>
@@ -559,9 +574,15 @@ order = Production web server,Backup NAS</code></pre>
 <ol>
 <li><strong>密码明文存储</strong>在 config.ini 中，见 8.3 节的安全提示。</li>
 <li><strong>编辑器一次性载入整个文件</strong>，超过 4 MB 会先提示确认，不适合编辑超大文件。</li>
-<li><strong>Permissions / Owner 列默认隐藏</strong>，因为六列在双栏布局下放不下；</li>
+<li><strong>Owner 列默认隐藏</strong>（省约 92 px）；<strong>Permissions 列默认显示</strong>。</li>
 </ol>
-<p>   需要时从 <strong>View</strong> 菜单打开。</p>
+<p>   两列都可以在 <strong>View</strong> 菜单里随时开关。</p>
+<ol>
+<li><strong>权限列的显示形式取决于服务器</strong>：给出 <code>unix.mode</code> 时显示</li>
+</ol>
+<p>   <code>-rw-r--r--</code> 这样的权限位；只给 MLSD <code>perm</code> 时显示该账号被允许的</p>
+<p>   操作字母（如 <code>-rawfdMT</code>）——详见 5.3 节。两者含义不同，客户端不会</p>
+<p>   把后者硬套成 Unix 格式。</p>
 <ol>
 <li><strong>严格的 SSH 主机密钥校验默认关闭</strong>，首次连接前请确认服务器身份。</li>
 </ol>

@@ -41,6 +41,70 @@ CHUNK = 64 * 1024
 FTP_ERRORS = tuple(ftplib.all_errors) + (OSError, EOFError)
 
 
+#: RFC 3659 "perm" fact letters, in the order the RFC documents them.  They
+#: describe what the *current user* may do, not the file's Unix mode, so they
+#: are shown as-is instead of being dressed up as "-rw-r--r--".
+MLSD_PERM_LETTERS = (
+    ("e", "enter"), ("l", "list"), ("r", "read"), ("a", "append"),
+    ("w", "write"), ("f", "rename"), ("d", "delete"), ("c", "create"),
+    ("m", "mkdir"), ("p", "delete inside"), ("M", "set last-modified time"),
+    ("T", "set last-modified time"),
+)
+
+
+def _permissions_from_mlsd_perm(text: str, is_dir: bool = False,
+                                is_link: bool = False) -> str:
+    """Render the MLSD ``perm`` fact as a readable permission string.
+
+    Many servers (pyftpdlib, pure-ftpd, IIS, ...) never send ``unix.mode``, so
+    without this the Permissions column stays empty.  RFC 3659 defines ``perm``
+    as the operations the current user may perform, which is the question the
+    column answers in practice.
+
+    Letters are emitted in the RFC order so the display is stable and
+    comparable between servers.
+    """
+    tokens = set((text or "").strip())
+    if not tokens:
+        return ""
+    kind = "d" if is_dir else ("l" if is_link else "-")
+    letters = "".join(letter for letter, _meaning in MLSD_PERM_LETTERS
+                      if letter in tokens)
+    return kind + letters if letters else ""
+
+
+def describe_mlsd_perm(text: str) -> str:
+    """Human readable expansion of an MLSD ``perm`` value, for tooltips."""
+    tokens = set((text or "").strip())
+    seen: List[str] = []
+    for letter, meaning in MLSD_PERM_LETTERS:
+        # M and T are two spellings of the same right
+        if letter in tokens and meaning not in seen:
+            seen.append(meaning)
+    return ", ".join(seen)
+
+
+def _mode_from_octal(text: str) -> Optional[int]:
+    """Turn an MLSD ``unix.mode`` value such as ``0644`` into an int mode.
+
+    Returns ``None`` when the server did not send a usable value, so callers
+    can fall back to the ``ls -l`` permissions instead of showing a bare
+    number.
+    """
+    value = (text or "").strip()
+    if not value:
+        return None
+    try:
+        # some servers send "644", others "0644" or "0o644"
+        cleaned = value.lower().replace("0o", "")
+        mode = int(cleaned, 8)
+    except (TypeError, ValueError):
+        return None
+    if mode <= 0:
+        return None
+    return mode
+
+
 class SessionError(Exception):
     """Any failure while talking to a server."""
 
@@ -652,12 +716,35 @@ class FTPSession(BaseSession):
             is_link = entry_type == "os.unix=slink" or "slink" in entry_type
             size = parse_size(info.get("size", ""))
             mtime = self._parse_mlsd_time(info.get("modify", ""))
-            entries.append(Entry(
+            # MLSD reports "unix.mode" as octal ("0644"); turn it into the same
+            # "-rw-r--r--" form the LIST parser produces, otherwise the
+            # Permissions column shows a bare number or nothing at all
+            mode = _mode_from_octal(info.get("unix.mode", ""))
+            if mode is not None:
+                # MLSD reports only the permission bits, so add the file-type
+                # bits to get the familiar "-rw-r--r--" / "drwxr-xr-x" string
+                if is_dir:
+                    mode |= stat_module.S_IFDIR
+                elif is_link:
+                    mode |= stat_module.S_IFLNK
+                else:
+                    mode |= stat_module.S_IFREG
+                permissions = stat_module.filemode(mode)
+            else:
+                # no unix.mode: fall back to the RFC 3659 perm fact, which is
+                # what most servers actually send
+                permissions = _permissions_from_mlsd_perm(
+                    info.get("perm", ""), is_dir, is_link)
+            entry = Entry(
                 name=name, size=size, mtime=mtime, is_dir=is_dir,
-                is_link=is_link, permissions=info.get("unix.mode", ""),
+                is_link=is_link, mode=mode, permissions=permissions,
                 owner=info.get("unix.owner", "") or info.get("unix.uid", ""),
                 group=info.get("unix.group", "") or info.get("unix.gid", ""),
-            ))
+            )
+            if info.get("perm"):
+                # keep the raw fact so the tooltip can spell the letters out
+                entry.extra["mlsd_perm"] = info["perm"]
+            entries.append(entry)
         return entries
 
     @staticmethod

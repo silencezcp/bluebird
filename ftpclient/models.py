@@ -457,6 +457,12 @@ class FileListModel(QAbstractTableModel):
             lines.append("Modified: %s" % format_time(entry.mtime))
         if entry.permissions:
             lines.append("Permissions: %s" % entry.permissions)
+        perm_fact = entry.extra.get("mlsd_perm")
+        if perm_fact:
+            from .session import describe_mlsd_perm
+            spelled = describe_mlsd_perm(perm_fact)
+            if spelled:
+                lines.append("The server allows: %s" % spelled)
         if entry.owner:
             lines.append("Owner: %s" % entry.owner)
         if entry.link_target:

@@ -32,7 +32,7 @@ from .retranslate import Retranslator
 from .session import SessionError, human_error
 from .theme import Theme
 from .transfer import TransferManager, plan_downloads, plan_uploads
-from .widgets import LogView, ProgressDelegate
+from .widgets import ColumnSeparatorDelegate, LogView, ProgressDelegate
 
 
 class TextViewerDialog(QDialog):
@@ -120,6 +120,15 @@ class TransferQueuePanel(QWidget):
         self.table.setWordWrap(False)
         self.table.setItemDelegateForColumn(
             3, ProgressDelegate(theme, self.table))
+        # the remaining columns get the plain separator delegate so the column
+        # rules are continuous from the header to the last row
+        self._separators = ColumnSeparatorDelegate(theme, self.table,
+                                                   "gridline", 2)
+        self.table.setItemDelegateForColumn(0, self._separators)
+        self.table.setItemDelegateForColumn(1, self._separators)
+        self.table.setItemDelegateForColumn(2, self._separators)
+        self.table.setItemDelegateForColumn(4, self._separators)
+        self.table.setItemDelegateForColumn(5, self._separators)
         header = self.table.horizontalHeader()
         header.setSectionResizeMode(0, QHeaderView.Stretch)
         for column, width in ((1, 100), (2, 90), (3, 130), (4, 100), (5, 170)):

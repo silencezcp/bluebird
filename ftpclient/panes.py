@@ -177,6 +177,8 @@ class FilePane(QWidget):
         self.model = FileListModel(self.theme, self.icons, self)
         self.table = FileTableView(self.side, self)
         self.table.setModel(self.model)
+        # crisp vertical rules between the columns (Name | Size | Type | ...)
+        self.table.attach_column_separators(self.theme)
         self.table.doubleClicked.connect(self._on_double_click)
         self.table.drop_files.connect(
             lambda source, names: self.files_dropped.emit(self, source, names))
@@ -208,6 +210,8 @@ class FilePane(QWidget):
         self.table.apply_theme(row_height, icon_size)
         self.table.setAlternatingRowColors(bool(appearance.get("alternating_rows", True)))
         self.table.setShowGrid(bool(appearance.get("grid_lines", False)))
+        # the separators use a palette colour, so they follow a theme change
+        self.table.refresh_separator_colour()
         self.header.hidden_button.setIcon(self._header_icon(
             "eye" if self.header.hidden_button.isChecked() else "eye_off"))
         # restore the width the user chose for the Name column
@@ -226,7 +230,7 @@ class FilePane(QWidget):
     def _apply_column_visibility(self) -> None:
         """Permissions / Owner can be switched off to save horizontal room."""
         self.table.setColumnHidden(4, not bool(
-            self.settings.get("appearance", "show_permissions", False)))
+            self.settings.get("appearance", "show_permissions", True)))
         self.table.setColumnHidden(5, not bool(
             self.settings.get("appearance", "show_owner", False)))
         # whichever column is visible last absorbs the spare width, so values
