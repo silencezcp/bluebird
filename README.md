@@ -6,7 +6,7 @@
 FTP/SFTP 双栏客户端，界面参考 **FileZilla Client** 的信息架构，但换成现代奶白色
 （milk-white / cream）视觉风格。
 
-<img src="docs/screenshots/21-app-icon.png" width="128" alt="应用图标">
+![应用图标](docs/screenshots/21-app-icon.png)
 
 应用图标是**代码画出来的**（`ftpclient/appicon.py`，用 QPainter 绘制一朵云 +
 FTP 字样 + 三个绿色节点），所以任何尺寸都清晰、也不会随附二进制素材：

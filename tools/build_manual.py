@@ -309,6 +309,19 @@ img {
 }
 .doc-header h1 { color: #FFFFFF; margin: 0 0 6px 0; }
 .doc-header .meta { color: #D8E6F2; font-size: 13.5px; }
+/* the application icon in the banner.  It is a light-blue cloud, so it needs
+   a light backing to be visible against the blue gradient.  The box is
+   border-box so the padding does not squeeze the image. */
+p.doc-mark {
+  margin: 2px 0 0 0; padding: 9px; background: #FFFFFF;
+  border: none; border-radius: 22px;
+  width: 96px; height: 96px; box-sizing: border-box; overflow: hidden;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.20);
+}
+p.doc-mark img {
+  width: 78px; height: 78px; max-width: none; display: block; margin: 0;
+  border: none; border-radius: 12px; box-shadow: none;
+}
 .toc {
   background: var(--surface); border: 1px solid var(--border);
   border-radius: 12px; padding: 16px 22px 18px 22px; margin: 0 0 30px 0;
@@ -407,11 +420,26 @@ def build_html(markdown: str, standalone: bool = True,
     if first:
         title_html = first.group(0)
         body = body.replace(title_html, "", 1)
-        # the line just under the title repeats the banner subtitle
-        body = re.sub(r"<p><strong>\s*版本[^<]*</strong>.*?</p>", "", body, count=1)
         body = body.lstrip()
-        header = ('<header class="doc-header">%s<div class="meta">%s</div></header>'
-                  % (title_html, SUBTITLE))
+
+        # The markdown puts the app icon and a version line right under the
+        # title; both belong in the banner, not in the flow of the document.
+        # They are lifted out here, otherwise the icon ends up below the table
+        # of contents where nobody sees it.
+        mark = ""
+        mark_match = re.search(
+            r'<p>\s*(<img src="data:image/[^"]*"[^>]*>)\s*</p>', body)
+        if mark_match:
+            mark = '<p class="doc-mark">%s</p>' % mark_match.group(1)
+            body = body.replace(mark_match.group(0), "", 1)
+
+        # the line under the title repeats the version/author of the banner
+        body = re.sub(r"<p>(?:\s*<strong>)?\s*版本[^<]*(?:</strong>)?.*?</p>",
+                      "", body, count=1)
+        body = body.lstrip()
+
+        header = ('<header class="doc-header">%s<div class="meta">%s</div>'
+                  '%s</header>' % (title_html, SUBTITLE, mark))
 
     if not standalone:
         return body
