@@ -59,6 +59,21 @@ BUILD_ROOTS = {
     "pyinstaller",
 }
 
+#: Tools run by tools/build_manual.py.  They are imported inside a function
+#: there, so the static import scan of the package does not see them.
+MANUAL_ROOTS = {
+    "fonttools",
+    "pymupdf",
+}
+
+#: Optional dependencies that nothing declares, but that our build needs.
+#: fontTools writes WOFF2 subsets only when brotli is importable; without it the
+#: fonts fall back to WOFF and the manual is a little larger, so the pin is
+#: worth carrying.
+EXTRA_BUILD_PINS = {
+    "brotli",
+}
+
 #: where each requirement came from, for the comments in the generated file
 NOTES = {
     "PyQt5": "the GUI framework",
@@ -78,6 +93,11 @@ NOTES = {
     "pyinstaller": "builds the exe; 6.x dropped Python 3.8 so this stays 5.13.2",
     "pyinstaller-hooks-contrib": "PyInstaller hooks",
     "altgraph": "PyInstaller dependency",
+    "fonttools": "subsets the manual's fonts; without it the PDF embeds whole "
+                 "font files and grows from 5 MB to 37 MB",
+    "brotli": "fontTools needs it to write WOFF2 font subsets",
+    "pymupdf": "adds the clickable table of contents and the bookmark outline "
+               "to the printed PDF (QtWebEngine writes none)",
     "pefile": "PyInstaller dependency",
     "pywin32-ctypes": "PyInstaller dependency",
     "importlib_metadata": "PyInstaller dependency",
@@ -200,14 +220,17 @@ def main() -> int:
         runtime.update(IMPLICIT_REQUIRES.get(name, ()))
 
     # TEST and BUILD add whatever is not already part of the runtime.  BUILD
-    # also starts from the explicitly invoked tools (PyInstaller).
+    # also starts from the explicitly invoked tools (PyInstaller); the manual
+    # tools are imported from inside a function, so they are named explicitly
+    # rather than found by the scan.
     lower_runtime = {name.lower() for name in runtime}
     test_extra = {name for name in closure(tests)
                   if name.lower() not in lower_runtime}
-    build_roots = (tools | BUILD_ROOTS) - app - tests
+    build_roots = (tools | BUILD_ROOTS | MANUAL_ROOTS) - app - tests
     build_extra = {name for name in closure(build_roots)
                    if name.lower() not in lower_runtime
                    and name.lower() not in {n.lower() for n in test_extra}}
+    build_extra |= EXTRA_BUILD_PINS
 
     def pins(names: Set[str]) -> List[Tuple[str, str]]:
         rows = []

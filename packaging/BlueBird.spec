@@ -165,76 +165,11 @@ exe = EXE(
     if os.path.isfile(os.path.join(ROOT, "packaging", "version_info.txt")) else None,
 )
 
-# ---------------------------------------------------------------------------
-# The command line client as its own console executable.
-#
-# It must be a *separate* program: Windows gives no stdout to a windowed
-# (console=False) executable, so "BlueBird.exe ls ..." would print nothing.
-# Analysing it apart from the GUI keeps Qt out of it as well, which is most of
-# the size, and keeps the dependency list honest.
-# ---------------------------------------------------------------------------
-cli_a = Analysis(
-    [os.path.join(ROOT, "bluebird_cli.py")],
-    pathex=[ROOT],
-    binaries=[],
-    datas=[],                      # configuration is read at run time
-    hiddenimports=[
-        "paramiko",
-        "paramiko.ed25519key",
-        "paramiko.ecdsakey",
-    ],
-    hookspath=[],
-    hooksconfig={},
-    runtime_hooks=[],
-    excludes=[
-        # everything GUI: this build is deliberately Qt free
-        "PyQt5", "PyQt5.QtCore", "PyQt5.QtGui", "PyQt5.QtWidgets",
-        "PyQt5.QtSvg", "PyQt5.QtPrintSupport", "PyQt5.QtWebEngineCore",
-        "PyQt5.QtWebEngineWidgets", "PyQt5.QtNetwork", "PyQt5.QtQml",
-        "PyQt5.QtQuick", "PyQt5.QtWebChannel",
-        "pyftpdlib", "tkinter", "unittest", "pydoc_data",
-        "matplotlib", "numpy", "pandas", "scipy", "PIL", "IPython",
-    ],
-    win_no_prefer_redirects=False,
-    win_private_assemblies=False,
-    cipher=None,
-    noarchive=False,
-)
-
-cli_pyz = PYZ(cli_a.pure, cli_a.zipped_data, cipher=None)
-
-cli_exe = EXE(
-    cli_pyz,
-    cli_a.scripts,
-    [],
-    exclude_binaries=True,
-    name="BlueBird-cli",
-    debug=False,
-    bootloader_ignore_signals=False,
-    strip=False,
-    upx=False,
-    # a console program, so the output actually reaches the terminal
-    console=True,
-    disable_windowed_traceback=False,
-    argv_emulation=False,
-    target_arch=None,
-    codesign_identity=None,
-    entitlements_file=None,
-    icon=os.path.join(ROOT, "packaging", "bluebird.ico")
-    if os.path.isfile(os.path.join(ROOT, "packaging", "bluebird.ico")) else None,
-    version=os.path.join(ROOT, "packaging", "version_info.txt")
-    if os.path.isfile(os.path.join(ROOT, "packaging", "version_info.txt")) else None,
-)
-
 coll = COLLECT(
     exe,
     a.binaries,
     a.zipfiles,
     a.datas,
-    cli_exe,
-    cli_a.binaries,
-    cli_a.zipfiles,
-    cli_a.datas,
     strip=False,
     upx=False,
     upx_exclude=[],

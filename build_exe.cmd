@@ -2,10 +2,8 @@
 rem ---------------------------------------------------------------------------
 rem  Build dist\BlueBird\ with the bundled Python 3.8.
 rem
-rem  Produces two programs:
-rem     dist\BlueBird\BlueBird.exe      the graphical client
-rem     dist\BlueBird\BlueBird-cli.exe  the command line client
-rem  plus docs\ (the user manual) and the Qt runtime.
+rem  Produces dist\BlueBird\BlueBird.exe plus docs\ (the user manual)
+rem  and the Qt runtime.
 rem ---------------------------------------------------------------------------
 setlocal
 set "PY=D:\DSH_Workspaces\Ftp\python.exe"
@@ -31,13 +29,7 @@ echo.
 type dist\BlueBird\bluebird-startup.log 2>nul
 
 echo.
-echo === self test of the packaged command line client ===
-dist\BlueBird\BlueBird-cli.exe selftest || goto :fail
-
-echo.
-echo Build finished:
-echo   dist\BlueBird\BlueBird.exe      graphical client
-echo   dist\BlueBird\BlueBird-cli.exe  command line client
+echo Build finished: dist\BlueBird\BlueBird.exe
 exit /b 0
 
 :fail

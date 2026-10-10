@@ -13,7 +13,6 @@ The package is deliberately split so the networking layer never imports Qt:
     ftpclient.models   - file list / transfer queue item models
     ftpclient.session  - FTP, FTPS and SFTP sessions behind one interface
     ftpclient.transfer - background transfer queue
-    ftpclient.cli      - the command line client
     ftpclient.app      - GUI entry point
 """
 

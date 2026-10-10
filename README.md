@@ -20,78 +20,15 @@ FTP/SFTP 双栏客户端，界面参考 **FileZilla Client** 的信息架构，�
 D:\DSH_Workspaces\Ftp\python.exe tools\make_icon.py
 ```
 
-## 两种界面：图形 + 命令行
+## 一个图形界面
 
-打包后有**两个 exe**，共用同一套会话层（`ftpclient/core.py` + `session.py`），
-所以两边行为一致，不会各写一份：
+产品只有一个可执行文件 `BlueBird.exe`，双击即可使用。
+界面结构参考 FileZilla（左右双栏 + 传输队列 + 日志），
+视觉风格为现代奶白色，并且**所有颜色都可自定义**。
 
-| 文件 | 界面 | 用途 |
-|---|---|---|
-| `BlueBird.exe` | **图形** | 双击使用的窗口程序 |
-| `BlueBird-cli.exe` | **命令行** | 在命令提示符 / 批处理 / 计划任务里使用 |
-
-> **为什么要两个 exe**：Windows 不会给「窗口程序」分配控制台，所以
-> `BlueBird.exe ls ...` 会执行但**什么都不打印**。命令行功能因此单独做成
-> 控制台程序 `BlueBird-cli.exe`；它**不含 Qt**，体积小得多，也不需要桌面环境。
-
-**命令行用法**（`BlueBird-cli.exe` 换成 `bluebird.cmd` 或
-`python -m ftpclient.cli` 等价）：
-
-```bat
-BlueBird-cli.exe ls sftp://silence@192.168.31.142:22      :: 列目录
-BlueBird-cli.exe ls -l --saved fa2oa                      :: 用已保存的连接
-BlueBird-cli.exe get sftp://user@host -r /pub/a.bin -d C:\Temp
-BlueBird-cli.exe put .\build.zip ftp://user@host -r /releases
-BlueBird-cli.exe mirror sftp://user@host -r /var/www -d .\www --delete
-BlueBird-cli.exe stat ftp://user@host -r /pub/report.pdf
-BlueBird-cli.exe sites                                    :: 列出已保存连接
-BlueBird-cli.exe --help
-```
-
-| 命令 | 作用 |
-|---|---|
-| `ls` | 列目录（`-l` 详情 / `--json` 机器可读 / `--pattern` 过滤） |
-| `stat` | 单个路径的大小、时间、权限、属主 |
-| `get` / `put` | 下载 / 上传文件或整个目录 |
-| `mirror` | 把远程目录树同步到本地（`--delete` 删除本地多余文件） |
-| `tree` | 显示远程目录树 |
-| `mkdir` / `rm` / `rename` / `chmod` | 建目录（自动建父级）/ 删除（`--recursive`）/ 改名 / 改权限 |
-| `cat` | 打印远程文本文件 |
-| `sites` | 列出 config.ini 里的连接 |
-| `selftest` | 打印版本与路径，排查环境问题 |
-
-要点：
-
-- 目标写法 `sftp://user@host:22`、`ftp://user:pass@host`、`user@host`，
-  也可以直接用 `--saved 连接名`
-- 密码优先用 `BLUEBIRD_PASSWORD` 环境变量（**不要写进脚本或历史记录**）
-- **退出码**：`0` 成功、`1` 出错、`2` 用法错误，方便 `if` 判断
-- **`get`/`put` 默认不覆盖**已存在的文件，要覆盖请加 `-f/--force`
-- 进度和提示走 **stderr**，stdout 只放数据，所以 `--json` 可以安全管道给别的程序
-- 等价的免脚本写法：`python -m ftpclient.cli <命令>`
-  （`python -m ftpclient` **不带** `.cli` 仍然是启动图形界面）
-
-`bluebird.cmd` / `bluebird.py` 在项目根目录；也可以用 exe 版本（见 2.5 节）。
-
-exe 的版本资源里也写入了作者：
-
-| 字段 | 值 |
-|---|---|
-| CompanyName | silence |
-| FileDescription | BlueBird - FTP / FTPS / SFTP client |
-| LegalCopyright | Copyright (c) 2026 silence |
-| Comments | Author: silence <2446522180@qq.com> |
-
-* **文件夹默认蓝色**，**文件默认跟随正文颜色**（深灰棕），两者都可以在
-  偏好设置里自由修改，并且内置了「冲突检测」，两者太接近时会给出警告。
-* 所有颜色（界面底色、边框、文字、强调色、选中色、传输队列状态色……共 34 项）
-  都可以实时修改并即时预览，不会和文件夹颜色打架。
-
-![主界面](docs/screenshots/01-main-cream.png)
-
-![盘符切换菜单](docs/screenshots/08-drive-picker.png)
-
----
+内置用户手册（`F1`，或菜单 **Help ▸ User manual**），
+手册带**可点击目录**：在程序里、在浏览器里、在 PDF 阅读器里
+都能一点跳到对应章节。
 
 ## 1. 快速开始
 
@@ -154,7 +91,7 @@ D:\DSH_Workspaces\Ftp\python.exe -m pip install -r requirements.txt ^
 
 > **验证方式**：本清单已在**全新 venv** 中实测——22 个包版本与固定值完全一致，
 > 应用自检通过（Qt / web engine / PyNaCl / Ed25519 签名 / 手册渲染），
-> 三套测试 **48 + 247 + 76 全部通过**。这证明清单既**充分**（不缺包）又**最小**
+> 两套测试 **48 + 320 全部通过**。这证明清单既**充分**（不缺包）又**最小**
 > （无多余包）。
 >
 > `pyqt5-tools` 不需要：界面全部用纯 Python + QSS + 运行时生成的 SVG 图标写成，
@@ -263,12 +200,11 @@ D:\DSH_Workspaces\Ftp\python.exe -m pip install -r requirements.txt ^
 
 ## 2.5 打包成 exe
 
-`dist\BlueBird\` 是免安装版（**约 282 MB**，不需要装 Python），里面有**两个程序**：
+`dist\BlueBird\` 是免安装版（**约 280 MB**，不需要装 Python），里面只有**一个程序**：
 
 | 文件 | 说明 |
 |---|---|
-| `BlueBird.exe` | 图形界面（窗口程序） |
-| `BlueBird-cli.exe` | 命令行界面（控制台程序，不含 Qt） |
+| `BlueBird.exe` | 图形界面，双击即用 |
 
 重新打包：
 
@@ -277,7 +213,7 @@ build_exe.cmd
 ```
 
 它会依次：重新生成图标（含手册里那份副本）→ 重建用户手册 →
-调用 PyInstaller（一次产出两个 exe）→ 分别跑 `--selftest` 自检。
+调用 PyInstaller → 跑一次 `--selftest` 自检。
 
 单独打包：
 
@@ -291,16 +227,37 @@ D:\DSH_Workspaces\Ftp\python.exe -m PyInstaller --clean --noconfirm ^
 | 输出 | `dist\BlueBird\`（**on-dir 模式**，不是单文件） |
 | 为什么不用单文件 | 单文件每次启动都要把约 280 MB 解压到临时目录，很慢；on-dir 秒开 |
 | 手册位置 | `dist\BlueBird\docs\`（**和 exe 同级**，可直接替换成你自己的版本） |
-| 自检 | `BlueBird.exe --selftest` → 写 `bluebird-startup.log`；`BlueBird-cli.exe selftest` |
+| 自检 | `BlueBird.exe --selftest` → 写 `bluebird-startup.log` |
 | 版本号 | `BlueBird.exe --version` |
 | 体积构成 | `Qt5WebEngineCore.dll` 97 MB（内置手册渲染必须）、`opengl32sw.dll` 20 MB（无显卡驱动的机器需要）、Qt 其它库 |
 
-> `BlueBird-cli.exe` 是在 spec 里用**独立 Analysis** 构建的，显式排除了 PyQt5，
-> 所以它不依赖 Qt；两个 exe 共用同一个 `dist\BlueBird\` 目录里的运行库。
-
 **已验证**：`--selftest` 在打包后报告 `frozen: True`、手册 HTML/PDF 均能找到、
 QtWebEngine 可用、主窗口构建成功、**手册页面真实渲染完成**；GUI 启动常驻
-（约 102 MB 内存）；`BlueBird-cli.exe` 可正常输出并实测连接真实 SFTP 服务器。
+（约 102 MB 内存）。
+
+### 用户手册的体积与目录跳转
+
+| 产物 | 体积 | 目录跳转 |
+|---|---|---|
+| `docs\用户手册.html` | **约 1.3 MB** | ✅ 点击目录即可跳转（自包含，字体与截图全部内嵌） |
+| `docs\用户手册.pdf` | **约 5.1 MB** | ✅ 目录条目可点击 + **PDF 书签大纲**（63 条） |
+
+> **PDF 从 37 MB 压到 5.1 MB**，靠三件事（都在 `tools/build_manual.py` 里）：
+> 1. **字体子集化** —— QtWebEngine 打印 PDF 时不裁剪字体，会把整个
+>    `Microsoft YaHei UI`（19 MB）塞进去，**而且塞两份**（常规 + 粗体）。
+>    现在用 `fontTools` 按手册实际用到的 837 个字符裁剪成 WOFF2，
+>    四个字体合计仅约 510 KB（37 MB → 15.5 MB）
+> 2. **消除字体回退** —— 页面上任何一个系统字体画不出的字符，WebEngine 都会
+>    回退到系统字体，并把**整个字体文件**嵌入（Cambria Math 一个就 9.3 MB）。
+>    现在 CSS 里不写任何系统字体名，缺失字符在构建时就替换掉了（15.5 MB → 5.0 MB）
+> 3. **截图单次编码** —— 之前内嵌的是「PNG 的 base64 再 base64」，光这一步就
+>    浪费 2.4 倍；现在按图选 PNG/JPEG 更小者，只编码一次
+
+> PDF 书签与目录链接由 `PyMuPDF` 在打印后写入 —— QtWebEngine 的
+> `printToPdf` **既不生成链接也不生成书签**。
+
+构建手册需要 `fonttools`、`brotli`（写 WOFF2）与 `PyMuPDF`，都已写进
+`requirements.txt` 的 BUILD 段；缺任何一个都会打印警告并降级（PDF 会变大或失去目录跳转）。
 
 打包脚本已经剔除了用不到的东西（Qt 自带翻译文件 23 MB、Qt3D/Sensors/Location
 等 QML 模块），所以比原始收集结果小约 30 MB。
@@ -445,7 +402,7 @@ order = Production web server,Backup NAS
 ```
 Ftp Client/
 ├─ run.py                     启动入口（源码运行）
-├─ bluebird.cmd              命令行包装（源码方式）`r`n├─ bluebird.py               命令行入口（源码方式）`r`n├─ bluebird_cli.py           打包用命令行入口`r`n├─ run.cmd / run_tests.cmd    免配置启动 / 测试
+├─ run.cmd / run_tests.cmd    免配置启动 / 测试
 ├─ build_exe.cmd              重建手册 → PyInstaller 打包 → 自检
 ├─ requirements.txt
 ├─ packaging/
@@ -471,7 +428,6 @@ Ftp Client/
 │  ├─ ftpserver.py            内嵌 pyftpdlib FTP 服务器
 │  ├─ test_ftp_roundtrip.py   会话层端到端测试（48 项）
 │  ├─ test_ui_smoke.py        界面无头冒烟测试（317 项）
-├─ test_cli.py            命令行客户端测试（76 项）
 ├─ tools/
 │  ├─ screenshot.py           生成文档截图
 │  └─ build_manual.py         由 Markdown 生成用户手册 HTML / PDF
@@ -480,7 +436,7 @@ Ftp Client/
 │  ├─ 用户手册.html           自包含 HTML（截图已内嵌）
 │  ├─ 用户手册.pdf            A4 打印版
 │  └─ screenshots/
-└─ dist/BlueBird/             打包产物（BlueBird.exe + BlueBird-cli.exe + docs/ + 运行库）
+└─ dist/BlueBird/             打包产物（BlueBird.exe + docs/ + 运行库）
 ```
 
 设计上有意把**网络层和界面层完全分开**：`session.py` 和 `transfer.py` 里没有
@@ -521,7 +477,6 @@ run_tests.cmd
 ```bat
 D:\DSH_Workspaces\Ftp\python.exe tests\test_ftp_roundtrip.py   :: 48 项
 D:\DSH_Workspaces\Ftp\python.exe tests\test_ui_smoke.py        :: 317 项（无头）
-D:\DSH_Workspaces\Ftp\python.exe tests\test_cli.py             :: 76 项（无需图形环境）
 ```
 
 覆盖范围：

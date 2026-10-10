@@ -50,6 +50,10 @@ pyftpdlib==2.2.0
 # -------------------------------------------------------------------------
 #   altgraph             PyInstaller dependency
 altgraph==0.17.5
+#   brotli               fontTools needs it to write WOFF2 font subsets
+brotli==1.2.0
+#   fonttools            subsets the manual's fonts; without it the PDF embeds whole font files and grows from 5 MB to 37 MB
+fonttools==4.57.0
 #   importlib_metadata   PyInstaller dependency
 importlib_metadata==8.5.0
 #   packaging            PyInstaller dependency
@@ -60,6 +64,7 @@ pefile==2024.8.26
 pyinstaller==5.13.2
 #   pyinstaller-hooks-contrib PyInstaller hooks
 pyinstaller-hooks-contrib==2026.8
+PyMuPDF==1.24.11
 #   pywin32-ctypes       PyInstaller dependency
 pywin32-ctypes==0.2.3
 #   setuptools           PyInstaller dependency
