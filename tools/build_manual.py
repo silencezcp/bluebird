@@ -970,8 +970,15 @@ def add_pdf_navigation(target: str, headings: "List[Tuple[int, str, str]]") -> b
             return False
 
         document.set_toc(outline)
-        document.save(target, incremental=True,
-                      encryption=fitz.PDF_ENCRYPT_KEEP)
+        try:
+            document.save(target, incremental=True,
+                          encryption=fitz.PDF_ENCRYPT_KEEP)
+        except Exception as exc:                 # usually a viewer holding it
+            print("  ! could not write the navigation into %s: %s"
+                  % (os.path.basename(target), exc))
+            print("    the PDF has no clickable contents; close it in your PDF "
+                  "viewer and run this again")
+            return False
         print("  navigation: %d table of contents link(s), %d bookmark(s)"
               % (links_added, len(outline)))
         return True
@@ -1231,7 +1238,7 @@ def build_book(book: "dict", font_cache: "dict") -> bool:
     if ok:
         add_pdf_navigation(PDF_OUT, headings)
 
-    if os.path.isfile(PDF_OUT):
+    if ok and os.path.isfile(PDF_OUT):
         size_mb = os.path.getsize(PDF_OUT) / 1048576.0
         print("  final PDF %.2f MB" % size_mb)
         if size_mb > 8:
