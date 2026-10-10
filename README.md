@@ -16,6 +16,49 @@ FTP 字样 + 三个绿色节点），所以任何尺寸都清晰、也不会随�
 D:\DSH_Workspaces\Ftp\python.exe tools\make_icon.py
 ```
 
+## 两种界面：图形 + 命令行
+
+同一套会话层（`ftpclient/core.py` + `session.py`）同时驱动 GUI 和 CLI，
+两边行为一致，不会各写一份。
+
+**命令行**（**不需要 PyQt5**，可在无桌面环境运行；脚本里很好用）：
+
+```bat
+smartftp.cmd ls sftp://silence@192.168.31.142:22          :: 列目录
+smartftp.cmd ls -l --saved fa2oa                          :: 用已保存的连接
+smartftp.cmd get sftp://user@host -r /pub/a.bin -d C:\Temp
+smartftp.cmd put .\build.zip ftp://user@host -r /releases
+smartftp.cmd mirror sftp://user@host -r /var/www -d .\www --delete
+smartftp.cmd stat ftp://user@host -r /pub/report.pdf
+smartftp.cmd sites                                        :: 列出已保存连接
+smartftp.cmd --help
+```
+
+| 命令 | 作用 |
+|---|---|
+| `ls` | 列目录（`-l` 详情 / `--json` 机器可读 / `--pattern` 过滤） |
+| `stat` | 单个路径的大小、时间、权限、属主 |
+| `get` / `put` | 下载 / 上传文件或整个目录 |
+| `mirror` | 把远程目录树同步到本地（`--delete` 删除本地多余文件） |
+| `tree` | 显示远程目录树 |
+| `mkdir` / `rm` / `rename` / `chmod` | 建目录（自动建父级）/ 删除（`--recursive`）/ 改名 / 改权限 |
+| `cat` | 打印远程文本文件 |
+| `sites` | 列出 config.ini 里的连接 |
+| `selftest` | 打印版本与路径，排查环境问题 |
+
+要点：
+
+- 目标写法 `sftp://user@host:22`、`ftp://user:pass@host`、`user@host`，
+  也可以直接用 `--saved 连接名`
+- 密码优先用 `SMART_FTP_PASSWORD` 环境变量（**不要写进脚本或历史记录**）
+- **退出码**：`0` 成功、`1` 出错、`2` 用法错误，方便 `if` 判断
+- **`get`/`put` 默认不覆盖**已存在的文件，要覆盖请加 `-f/--force`
+- 进度和提示走 **stderr**，stdout 只放数据，所以 `--json` 可以安全管道给别的程序
+- 等价的免脚本写法：`python -m ftpclient.cli <命令>`
+  （`python -m ftpclient` **不带** `.cli` 仍然是启动图形界面）
+
+`smartftp.cmd` / `smartftp.py` 在项目根目录；也可以用 exe 版本（见 2.5 节）。
+
 exe 的版本资源里也写入了作者：
 
 | 字段 | 值 |
@@ -97,7 +140,7 @@ D:\DSH_Workspaces\Ftp\python.exe -m pip install -r requirements.txt ^
 
 > **验证方式**：本清单已在**全新 venv** 中实测——22 个包版本与固定值完全一致，
 > 应用自检通过（Qt / web engine / PyNaCl / Ed25519 签名 / 手册渲染），
-> 两套测试 **48 + 247 全部通过**。这证明清单既**充分**（不缺包）又**最小**
+> 三套测试 **48 + 247 + 76 全部通过**。这证明清单既**充分**（不缺包）又**最小**
 > （无多余包）。
 >
 > `pyqt5-tools` 不需要：界面全部用纯 Python + QSS + 运行时生成的 SVG 图标写成，
@@ -403,7 +446,8 @@ Ftp Client/
 ├─ tests/
 │  ├─ ftpserver.py            内嵌 pyftpdlib FTP 服务器
 │  ├─ test_ftp_roundtrip.py   会话层端到端测试（48 项）
-│  └─ test_ui_smoke.py        界面无头冒烟测试（247 项）
+│  ├─ test_ui_smoke.py        界面无头冒烟测试（317 项）
+├─ test_cli.py            命令行客户端测试（76 项）
 ├─ tools/
 │  ├─ screenshot.py           生成文档截图
 │  └─ build_manual.py         由 Markdown 生成用户手册 HTML / PDF
@@ -452,7 +496,8 @@ run_tests.cmd
 
 ```bat
 D:\DSH_Workspaces\Ftp\python.exe tests\test_ftp_roundtrip.py   :: 48 项
-D:\DSH_Workspaces\Ftp\python.exe tests\test_ui_smoke.py        :: 247 项（无头）
+D:\DSH_Workspaces\Ftp\python.exe tests\test_ui_smoke.py        :: 317 项（无头）
+D:\DSH_Workspaces\Ftp\python.exe tests\test_cli.py             :: 76 项（无需图形环境）
 ```
 
 覆盖范围：
@@ -463,7 +508,7 @@ D:\DSH_Workspaces\Ftp\python.exe tests\test_ui_smoke.py        :: 247 项（无�
   （路径不存在、端口拒绝且报错信息可读）、**7 条 FTP 错误路径必须抛
   `SessionError` 而不是 `TypeError`**、**`SIZE`/`MDTM` 单文件大小查询**、
   取消传输后自动重连。
-* **界面层 247 项**：
+* **界面层 317 项**：
   * **内置手册与帮助菜单**：资源定位（源码/打包两种模式）、手册 HTML/PDF/MD 均能找到、
     HTML 自包含且已记录新功能、Help 菜单四项齐全、F1 打开手册、Shift+F1 快捷键、
     词条齐备、无 web 引擎时有浏览器回退；

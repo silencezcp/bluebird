@@ -21,7 +21,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 from PyQt5.QtCore import QObject, QRunnable, QThreadPool, QTimer, pyqtSignal
 
 from . import session as _session
-from .models import Entry, TransferItem
+from .core import Entry, TransferItem
 
 #: transfers slower than this tick are still reported at least twice a second
 REPORT_INTERVAL = 0.2

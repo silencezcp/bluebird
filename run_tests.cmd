@@ -10,6 +10,9 @@ echo.
 echo ==== user interface smoke test ====
 "%PY%" tests\test_ui_smoke.py || goto :fail
 echo.
+echo ==== command line client ====
+"%PY%" tests\test_cli.py || goto :fail
+echo.
 echo ==== packaged build (skipped when dist\ is absent) ====
 if exist "dist\SmartFTP\SmartFTP.exe" (
     dist\SmartFTP\SmartFTP.exe --selftest || goto :fail

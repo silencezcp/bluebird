@@ -28,7 +28,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import paramiko
 
-from .models import Entry, parse_size
+from .core import Entry, parse_size
 
 ProgressFn = Optional[Callable[[int, Optional[int]], None]]
 
@@ -489,7 +489,7 @@ class BaseSession(object):
     def delete(self, name: str, is_dir: bool = False) -> None:
         raise NotImplementedError
 
-    def delete_recursive(self, name: str, is_dir: bool = True) -> None:
+    def delete_recursive(self, name: str, is_dir: bool = True) -> int:
         raise NotImplementedError
 
     def chmod(self, name: str, mode: int) -> None:
@@ -829,17 +829,25 @@ class FTPSession(BaseSession):
             except ftplib.all_errors as exc:
                 raise SessionError(human_error(exc))
 
-    def delete_recursive(self, name: str, is_dir: bool = True) -> None:
+    def delete_recursive(self, name: str, is_dir: bool = True) -> int:
+        """Delete a path, recursing into folders.  Returns how many went.
+
+        Callers report that count back to the user; returning None here used to
+        crash the format string that prints it.
+        """
         if not is_dir:
             self.delete(name, False)
-            return
+            return 1
+        removed = 0
         for entry in self.listdir(name):
             child = posixpath.join(name, entry.name)
             if entry.is_dir and not entry.is_link:
-                self.delete_recursive(child, True)
+                removed += self.delete_recursive(child, True)
             else:
                 self.delete(child, False)
+                removed += 1
         self.delete(name, True)
+        return removed + 1
 
     def chmod(self, name: str, mode: int) -> None:
         with self.lock:
@@ -933,6 +941,12 @@ class FTPSession(BaseSession):
             ftp = self._ftp
             if ftp is None:
                 return None
+            # A chatty server sends its extra completion reply only when the
+            # next command arrives, so it can still be queued here.  Without
+            # this drain the TYPE I below reads that stray 226 and every later
+            # reply belongs to the previous command - which is what made a
+            # transfer fail with "Server refused transfer: 213 2564".
+            self._drain_control(settle=0.05, max_wait=0.25)
             try:
                 # sendcmd() rather than voidcmd(): some servers answer with a
                 # non-200 2xx here and voidcmd() would raise
@@ -946,6 +960,10 @@ class FTPSession(BaseSession):
                 return int(value)
             except FTP_ERRORS + (TypeError, ValueError):
                 return None
+            finally:
+                # Whatever happened, leave nothing queued for the transfer
+                # itself: the size is only used for the progress bar.
+                self._drain_control(settle=0.05, max_wait=0.25)
 
     def switch_to_binary(self) -> bool:
         """Put the data connection in binary (image) mode."""
@@ -1309,7 +1327,9 @@ class SFTPSession(BaseSession):
     def chdir(self, path: str) -> str:
         with self.lock:
             try:
-                resolved = self.sftp.normalize(path or ".")
+                # resolve against our own directory, not the login home: SFTP
+                # has no server-side current directory to lean on
+                resolved = self.sftp.normalize(self._absolute(path or "."))
             except Exception as exc:
                 raise SessionError(human_error(exc))
             self._cwd = resolved
@@ -1318,14 +1338,15 @@ class SFTPSession(BaseSession):
     def mkdir(self, name: str) -> None:
         with self.lock:
             try:
-                self.sftp.mkdir(name)
+                self.sftp.mkdir(self._absolute(name))
             except Exception as exc:
                 raise SessionError(human_error(exc))
 
     # -- listing --------------------------------------------------------
     def listdir(self, path: Optional[str] = None) -> List[Entry]:
         with self.lock:
-            target = path if path is not None else (self._cwd or ".")
+            target = self._absolute(path) if path is not None \
+                else (self._cwd or ".")
             try:
                 attrs = self.sftp.listdir_attr(target)
             except Exception as exc:
@@ -1415,9 +1436,11 @@ class SFTPSession(BaseSession):
         with self.lock:
             try:
                 try:
-                    self.sftp.posix_rename(old, new)
+                    self.sftp.posix_rename(self._absolute(old),
+                                           self._absolute(new))
                 except (IOError, OSError, AttributeError):
-                    self.sftp.rename(old, new)
+                    self.sftp.rename(self._absolute(old),
+                                     self._absolute(new))
             except Exception as exc:
                 raise SessionError(human_error(exc))
 
@@ -1425,28 +1448,36 @@ class SFTPSession(BaseSession):
         with self.lock:
             try:
                 if is_dir:
-                    self.sftp.rmdir(name)
+                    self.sftp.rmdir(self._absolute(name))
                 else:
-                    self.sftp.remove(name)
+                    self.sftp.remove(self._absolute(name))
             except Exception as exc:
                 raise SessionError(human_error(exc))
 
-    def delete_recursive(self, name: str, is_dir: bool = True) -> None:
+    def delete_recursive(self, name: str, is_dir: bool = True) -> int:
+        """Delete a path, recursing into folders.  Returns how many went.
+
+        Callers report that count back to the user; returning None here used to
+        crash the format string that prints it.
+        """
         if not is_dir:
             self.delete(name, False)
-            return
+            return 1
+        removed = 0
         for entry in self.listdir(name):
             child = posixpath.join(name, entry.name)
             if entry.is_dir and not entry.is_link:
-                self.delete_recursive(child, True)
+                removed += self.delete_recursive(child, True)
             else:
                 self.delete(child, False)
+                removed += 1
         self.delete(name, True)
+        return removed + 1
 
     def chmod(self, name: str, mode: int) -> None:
         with self.lock:
             try:
-                self.sftp.chmod(name, mode)
+                self.sftp.chmod(self._absolute(name), mode)
             except Exception as exc:
                 raise SessionError(human_error(exc))
 
@@ -1454,7 +1485,7 @@ class SFTPSession(BaseSession):
         if not path or path in (".", "/"):
             return
         try:
-            self.sftp.stat(path)
+            self.sftp.stat(self._absolute(path))
             return
         except Exception:
             pass
@@ -1462,7 +1493,7 @@ class SFTPSession(BaseSession):
         if parent and parent != path:
             self._ensure_remote_dir(parent)
         try:
-            self.sftp.mkdir(path)
+            self.sftp.mkdir(self._absolute(path))
         except Exception:
             pass
 
@@ -1472,14 +1503,16 @@ class SFTPSession(BaseSession):
                       control: Optional[TransferControl] = None) -> int:
         with self.lock:
             try:
-                attr = self.sftp.stat(remote_name)
+                target = self._absolute(remote_name)
+                attr = self.sftp.stat(target)
                 total: Optional[int] = attr.st_size
             except Exception:
                 total = None
             done = 0
             self._report(progress, 0, total)
             try:
-                remote = self.sftp.open(remote_name, "rb")
+                remote = self.sftp.open(self._absolute(remote_name),
+                                        "rb")
             except Exception as exc:
                 raise SessionError(human_error(exc))
             try:
@@ -1526,7 +1559,8 @@ class SFTPSession(BaseSession):
         with self.lock:
             try:
                 self._ensure_remote_dir(posixpath.dirname(remote_name))
-                remote = self.sftp.open(remote_name, "wb")
+                remote = self.sftp.open(self._absolute(remote_name),
+                                        "wb")
             except Exception as exc:
                 raise SessionError(human_error(exc))
             try:
@@ -1559,10 +1593,12 @@ class SFTPSession(BaseSession):
             try:
                 if self.config.get("preserve_timestamps"):
                     info = os.stat(local_path)
-                    self.sftp.utime(remote_name, (info.st_atime, info.st_mtime))
+                    self.sftp.utime(self._absolute(remote_name),
+                                    (info.st_atime, info.st_mtime))
                 elif self.config.get("preserve_permissions"):
                     info = os.stat(local_path)
-                    self.sftp.chmod(remote_name, stat_module.S_IMODE(info.st_mode))
+                    self.sftp.chmod(self._absolute(remote_name),
+                                    stat_module.S_IMODE(info.st_mode))
             except Exception:
                 pass
         self._report(progress, done, total or done)
@@ -1571,7 +1607,7 @@ class SFTPSession(BaseSession):
     def read_text(self, name: str, limit: int = 1024 * 1024) -> str:
         with self.lock:
             try:
-                with self.sftp.open(name, "rb") as handle:
+                with self.sftp.open(self._absolute(name), "rb") as handle:
                     data = handle.read(limit)
             except Exception as exc:
                 raise SessionError(human_error(exc))
@@ -1580,7 +1616,7 @@ class SFTPSession(BaseSession):
     def write_text(self, name: str, text: str) -> None:
         with self.lock:
             try:
-                with self.sftp.open(name, "wb") as handle:
+                with self.sftp.open(self._absolute(name), "wb") as handle:
                     handle.write(text.encode("utf-8"))
             except Exception as exc:
                 raise SessionError(human_error(exc))
