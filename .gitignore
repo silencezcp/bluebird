@@ -6,7 +6,7 @@ __pycache__/
 build/
 dist/
 *.spec.bak
-nacreftp-startup.log
+smartftp-startup.log
 .smoke/
 .smoketest/
 COMMIT_MSG.txt
@@ -15,3 +15,4 @@ COMMIT_MSG.txt
 COMMIT.txt
 MSG_COMMIT.txt
 MSG_SFTP.txt
+MSG_RENAME.txt

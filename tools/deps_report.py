@@ -247,7 +247,7 @@ def write_requirements(groups, installed) -> None:
     """Rewrite requirements.txt (ASCII only - see the note below)."""
     lines: List[str] = [
         "# " + "=" * 73,
-        "#  Nacre FTP - complete dependency list (exported from the real "
+        "#  Smart FTP - complete dependency list (exported from the real "
         "environment)",
         "# " + "=" * 73,
         "#  Environment : Python %s on Windows" % sys.version.split()[0],

@@ -1,4 +1,4 @@
-# Nacre FTP — 现代奶白色 FTP / FTPS / SFTP 客户端
+# Smart FTP — 现代奶白色 FTP / FTPS / SFTP 客户端
 
 **作者：silence** ｜ 版本 1.0.0
 
@@ -12,7 +12,7 @@ FTP/SFTP 双栏客户端，界面参考 **FileZilla Client** 的信息架构，�
 FTP 字样 + 三个绿色节点），所以任何尺寸都清晰、也不会随附二进制素材：
 
 ```bat
-:: 重新生成 packaging\nacreftp.ico（7 种尺寸）与 version_info.txt（含作者）
+:: 重新生成 packaging\smartftp.ico（7 种尺寸）与 version_info.txt（含作者）
 D:\DSH_Workspaces\Ftp\python.exe tools\make_icon.py
 ```
 
@@ -21,7 +21,7 @@ exe 的版本资源里也写入了作者：
 | 字段 | 值 |
 |---|---|
 | CompanyName | silence |
-| FileDescription | Nacre FTP - FTP / FTPS / SFTP client |
+| FileDescription | Smart FTP - FTP / FTPS / SFTP client |
 | LegalCopyright | Copyright (c) 2026 silence |
 | Comments | Author: silence <2446522180@qq.com> |
 
@@ -206,7 +206,7 @@ D:\DSH_Workspaces\Ftp\python.exe -m pip install -r requirements.txt ^
 
 ## 2.5 打包成 exe
 
-`dist\NacreFTP\NacreFTP.exe` 是免安装版（**约 282 MB**，不需要装 Python）。
+`dist\SmartFTP\SmartFTP.exe` 是免安装版（**约 282 MB**，不需要装 Python）。
 重新打包：
 
 ```bat
@@ -219,16 +219,16 @@ build_exe.cmd
 
 ```bat
 D:\DSH_Workspaces\Ftp\python.exe -m PyInstaller --clean --noconfirm ^
-    packaging\NacreFTP.spec
+    packaging\SmartFTP.spec
 ```
 
 | 项目 | 说明 |
 |---|---|
-| 输出 | `dist\NacreFTP\`（**ondir 模式**，不是单文件） |
+| 输出 | `dist\SmartFTP\`（**ondir 模式**，不是单文件） |
 | 为什么不用单文件 | 单文件每次启动都要把约 280 MB 解压到临时目录，很慢；on-dir 秒开 |
-| 手册位置 | `dist\NacreFTP\docs\`（**和 exe 同级**，可直接替换成你自己的版本） |
-| 自检 | `NacreFTP.exe --selftest` → 写 `nacreftp-startup.log` |
-| 版本号 | `NacreFTP.exe --version` |
+| 手册位置 | `dist\SmartFTP\docs\`（**和 exe 同级**，可直接替换成你自己的版本） |
+| 自检 | `SmartFTP.exe --selftest` → 写 `smartftp-startup.log` |
+| 版本号 | `SmartFTP.exe --version` |
 | 体积构成 | `Qt5WebEngineCore.dll` 97 MB（内置手册渲染必须）、`opengl32sw.dll` 20 MB（无显卡驱动的机器需要）、Qt 其它库 |
 
 **已验证**：`--selftest` 在打包后报告 `frozen: True`、手册 HTML/PDF 均能找到、
@@ -246,15 +246,15 @@ QtWebEngine 可用、主窗口构建成功、**手册页面真实渲染完成**�
 **每次连接成功后都会自动保存**，不需要额外勾选。保存位置：
 
 ```
-%APPDATA%\.nacreftp\config.ini
+%APPDATA%\.smartftp\config.ini
 ```
 
-（可用环境变量 `NACRE_FTP_CONFIG` 指定别的路径；偏好设置也会有同样路径的提示）
+（可用环境变量 `SMART_FTP_CONFIG` 指定别的路径；偏好设置也会有同样路径的提示）
 
 文件内容就是普通 INI，可以直接用记事本编辑、备份或拷到别的机器：
 
 ```ini
-# Nacre FTP - saved server connections
+# Smart FTP - saved server connections
 # One section per connection. Passwords are stored in clear text: keep this file private.
 
 [Production web server]
@@ -343,7 +343,7 @@ order = Production web server,Backup NAS
   * 直接输入十六进制值（`#2E6FA8`）；
   * 点 **Pick…** 打开取色器；
   * 点 **Reset** 恢复该项默认值，**Reset all** 恢复整套默认。
-* 顶部有 4 套预设主题：**Nacre (cream)**（默认奶白）、**Cloud**、**Matcha**、
+* 顶部有 4 套预设主题：**Smart (cream)**（默认奶白）、**Cloud**、**Matcha**、
   **Linen (dark)**。
 
 ### 文件夹与文件的颜色关系
@@ -368,8 +368,8 @@ order = Production web server,Backup NAS
 所有颜色改动都是**即时预览**：改一下颜色，两个面板、图标、队列立刻更新；
 点 `Cancel` 会还原成打开设置前的样子。
 
-设置保存在 `%APPDATA%\.nacreftp\settings.json`（可以用环境变量
-`NACRE_FTP_SETTINGS` 指定别的路径）。
+设置保存在 `%APPDATA%\.smartftp\settings.json`（可以用环境变量
+`SMART_FTP_SETTINGS` 指定别的路径）。
 
 ---
 
@@ -382,7 +382,7 @@ Ftp Client/
 ├─ build_exe.cmd              重建手册 → PyInstaller 打包 → 自检
 ├─ requirements.txt
 ├─ packaging/
-│  └─ NacreFTP.spec           PyInstaller 配置（on-dir、剔除无用 Qt 模块）
+│  └─ SmartFTP.spec           PyInstaller 配置（on-dir、剔除无用 Qt 模块）
 ├─ ftpclient/
 │  ├─ app.py                  引导、高 DPI、异常兜底、URL 参数、--selftest
 │  ├─ main.py                 主窗口：连接栏、双栏、队列、日志、全部业务动作
@@ -412,7 +412,7 @@ Ftp Client/
 │  ├─ 用户手册.html           自包含 HTML（截图已内嵌）
 │  ├─ 用户手册.pdf            A4 打印版
 │  └─ screenshots/
-└─ dist/NacreFTP/             打包产物（NacreFTP.exe + docs/ + Qt 运行时）
+└─ dist/SmartFTP/             打包产物（SmartFTP.exe + docs/ + Qt 运行时）
 ```
 
 设计上有意把**网络层和界面层完全分开**：`session.py` 和 `transfer.py` 里没有

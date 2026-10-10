@@ -55,7 +55,7 @@ class TestFTPServer(object):
         # would let a second server clobber a running one.
         handler = type("Handler_%d" % id(self), (base,), {
             "authorizer": authorizer,
-            "banner": "Nacre test server ready.",
+            "banner": "Smart test server ready.",
             "passive_ports": range(self.passive_base,
                                    self.passive_base + 40),
         })
@@ -158,7 +158,7 @@ def make_tree(root: str) -> None:
     os.makedirs(os.path.join(root, "docs"), exist_ok=True)
     os.makedirs(os.path.join(root, "media", "nested"), exist_ok=True)
     with open(os.path.join(root, "readme.txt"), "w", encoding="utf-8") as handle:
-        handle.write("hello nacre\n")
+        handle.write("hello smart\n")
     with open(os.path.join(root, "data.bin"), "wb") as handle:
         handle.write(bytes(range(256)) * 8)
     with open(os.path.join(root, "docs", "guide.md"), "w", encoding="utf-8") as handle:

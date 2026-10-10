@@ -216,10 +216,10 @@ def write_assets(folder: str) -> List[str]:
     written: List[str] = []
     if not os.path.isdir(folder):
         os.makedirs(folder)
-    png = os.path.join(folder, "nacreftp.png")
+    png = os.path.join(folder, "smartftp.png")
     if save_png(png, 256):
         written.append(png)
-    ico = os.path.join(folder, "nacreftp.ico")
+    ico = os.path.join(folder, "smartftp.ico")
     if save_ico(ico):
         written.append(ico)
     return written

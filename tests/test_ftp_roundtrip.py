@@ -40,7 +40,7 @@ def check(name, condition, detail=""):
 
 
 def main():
-    workdir = tempfile.mkdtemp(prefix="nacre-ftp-")
+    workdir = tempfile.mkdtemp(prefix="smart-ftp-")
     server_root = os.path.join(workdir, "server")
     local_root = os.path.join(workdir, "client")
     os.makedirs(server_root)
@@ -62,7 +62,7 @@ def main():
         print("\n-- connect --")
         ftp.connect()
         check("connect", ftp.connected)
-        check("banner", "Nacre" in (ftp.banner or ""), ftp.banner)
+        check("banner", "Smart" in (ftp.banner or ""), ftp.banner)
 
         print("\n-- listing --")
         entries = ftp.listdir()
@@ -142,7 +142,7 @@ def main():
         with open(target, "r", encoding="utf-8") as handle:
             content = handle.read()
         check("download size", written == expected_size, str(written))
-        check("download content", content.strip() == "hello nacre", repr(content))
+        check("download content", content.strip() == "hello smart", repr(content))
         check("progress reported", len(progress) >= 2, str(len(progress)))
         check("progress reached total", progress[-1][0] == expected_size,
               str(progress[-1]))

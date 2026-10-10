@@ -11,10 +11,10 @@ echo ==== user interface smoke test ====
 "%PY%" tests\test_ui_smoke.py || goto :fail
 echo.
 echo ==== packaged build (skipped when dist\ is absent) ====
-if exist "dist\NacreFTP\NacreFTP.exe" (
-    dist\NacreFTP\NacreFTP.exe --selftest || goto :fail
+if exist "dist\SmartFTP\SmartFTP.exe" (
+    dist\SmartFTP\SmartFTP.exe --selftest || goto :fail
 ) else (
-    echo dist\NacreFTP\NacreFTP.exe not built - run build_exe.cmd first
+    echo dist\SmartFTP\SmartFTP.exe not built - run build_exe.cmd first
 )
 echo.
 echo All test suites passed.

@@ -16,7 +16,7 @@ from PyQt5.QtWidgets import (QAbstractItemView, QAction, QComboBox,
 
 from .models import ENTRY_ROLE, ITEM_ID_ROLE, FILE_COLUMNS
 
-FILE_MIME = "application/x-nacreftp-files"
+FILE_MIME = "application/x-smartftp-files"
 
 #: default width of the Name column (the user can drag it; it never stretches)
 NAME_COLUMN_WIDTH = 260

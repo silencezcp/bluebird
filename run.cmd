@@ -1,6 +1,6 @@
 @echo off
 rem ---------------------------------------------------------------------------
-rem  Launch the Nacre FTP client with the bundled Python 3.8 interpreter.
+rem  Launch the Smart FTP client with the bundled Python 3.8 interpreter.
 rem  Any arguments are forwarded, e.g.  run.cmd sftp://user@host:22
 rem ---------------------------------------------------------------------------
 setlocal

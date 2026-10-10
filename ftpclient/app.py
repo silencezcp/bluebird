@@ -112,14 +112,14 @@ def startup_log_path() -> str:
     """Where ``--log`` writes: beside the exe, never inside the bundle."""
     from .resources import is_frozen, resource_root
     base = os.path.dirname(sys.executable) if is_frozen() else resource_root()
-    return os.path.join(base, "nacreftp-startup.log")
+    return os.path.join(base, "smartftp-startup.log")
 
 
 def run_selftest() -> int:
     """Build the application, load the manual, then exit.
 
     Packaged builds have no console, so this is how a frozen executable is
-    verified: ``NacreFTP.exe --selftest --log``.
+    verified: ``SmartFTP.exe --selftest --log``.
     """
     from .resources import is_frozen, resource_root
     from . import __appname__, __version__
@@ -190,7 +190,7 @@ def run_selftest() -> int:
             format=serialization.PrivateFormat.OpenSSH,
             encryption_algorithm=serialization.NoEncryption())
         _key = Ed25519Key.from_private_key(_io.StringIO(_pem.decode()))
-        _key.sign_ssh_data(b"nacre-selftest")
+        _key.sign_ssh_data(b"smart-selftest")
         report.append("ed25519     : sign ok (%s, %d bits)"
                       % (_key.get_name(), _key.get_bits()))
     except Exception as exc:
@@ -302,7 +302,7 @@ def run(argv: Optional[List[str]] = None) -> int:
 
     i18n.changed.connect(on_language_changed)
 
-    # allow ``NacreFTP.exe sftp://user@host:22`` style arguments
+    # allow ``SmartFTP.exe sftp://user@host:22`` style arguments
     args = connection_arguments(argv)
     if args:
         _connect_from_argument(window, args[0])

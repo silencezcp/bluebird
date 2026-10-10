@@ -266,7 +266,7 @@ class MainWindow(QMainWindow):
         self._overwrite_all = False
         #: the test suite runs windowless, so it can mute the status dialogs
         self._quiet_dialogs = bool(
-            os.environ.get("NACRE_FTP_QUIET_DIALOGS", ""))
+            os.environ.get("SMART_FTP_QUIET_DIALOGS", ""))
         #: the last connection error, kept for the tests and the status line
         self._last_connection_error = ""
         # a member timer (not a bare singleShot) so it can be cancelled when
@@ -1784,7 +1784,7 @@ class MainWindow(QMainWindow):
 
     def save_log(self) -> None:
         path, _ = QFileDialog.getSaveFileName(
-            self, "Save log", "nacreftp-log.txt", "Text files (*.txt)")
+            self, "Save log", "smartftp-log.txt", "Text files (*.txt)")
         if not path:
             return
         try:

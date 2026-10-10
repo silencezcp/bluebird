@@ -43,7 +43,7 @@ class SizeFetcher(QObject):
         self.names = list(names)
         self._stop = False
         self._thread = QThread()
-        self._thread.setObjectName("nacre-size-fetcher")
+        self._thread.setObjectName("smart-size-fetcher")
         self.moveToThread(self._thread)
         self._thread.started.connect(self._work)
         self._thread.finished.connect(self.deleteLater)

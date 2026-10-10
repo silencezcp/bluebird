@@ -5,8 +5,8 @@
 
 Produces, in ``packaging/``:
 
-* ``nacreftp.png``          256 px preview / store icon
-* ``nacreftp.ico``          multi-resolution icon used by the executable
+* ``smartftp.png``          256 px preview / store icon
+* ``smartftp.ico``          multi-resolution icon used by the executable
 * ``version_info.txt``      PyInstaller version resource (author: silence)
 
 The artwork lives in :mod:`ftpclient.appicon` and is drawn with QPainter, so it
@@ -72,7 +72,7 @@ VSVersionInfo(
          StringStruct('FileVersion', '{version}'),
          StringStruct('InternalName', '{appname}'),
          StringStruct('LegalCopyright', '{copyright}'),
-         StringStruct('OriginalFilename', 'NacreFTP.exe'),
+         StringStruct('OriginalFilename', 'SmartFTP.exe'),
          StringStruct('ProductName', '{appname}'),
          StringStruct('ProductVersion', '{version}'),
          StringStruct('Author', '{author}'),

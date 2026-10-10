@@ -151,7 +151,7 @@ class Theme(QObject):
             return ""
         try:
             if not self._asset_dir:
-                self._asset_dir = tempfile.mkdtemp(prefix="nacreftp-")
+                self._asset_dir = tempfile.mkdtemp(prefix="smartftp-")
             path = os.path.join(self._asset_dir, name + ".png")
             if not os.path.isfile(path):
                 pixmap = builder()

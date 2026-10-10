@@ -52,15 +52,15 @@ def main():
     if not os.path.isdir(outdir):
         os.makedirs(outdir)
 
-    workdir = tempfile.mkdtemp(prefix="nacre-shot-")
+    workdir = tempfile.mkdtemp(prefix="smart-shot-")
     settings_path = os.path.join(workdir, "settings.json")
-    os.environ["NACRE_FTP_SETTINGS"] = settings_path
+    os.environ["SMART_FTP_SETTINGS"] = settings_path
 
     app = build_application([])
 
     # --- a local tree the left pane can show ---------------------------
     local_root = os.path.join(workdir, "Local")
-    os.makedirs(os.path.join(local_root, "Projects", "nacre"), exist_ok=True)
+    os.makedirs(os.path.join(local_root, "Projects", "smart"), exist_ok=True)
     os.makedirs(os.path.join(local_root, "Pictures"), exist_ok=True)
     for name, size in (("report-2026.pdf", 240_000), ("notes.txt", 1_240),
                        ("archive.zip", 5_600_000), ("budget.xlsx", 88_400),
@@ -68,7 +68,7 @@ def main():
                        ("index.html", 4_200), ("data.csv", 15_000)):
         with open(os.path.join(local_root, name), "wb") as handle:
             handle.write(b"x" * min(size, 4096))
-    with open(os.path.join(local_root, "Projects", "nacre", "main.py"), "w") as h:
+    with open(os.path.join(local_root, "Projects", "smart", "main.py"), "w") as h:
         h.write("print('hi')\n")
     with open(os.path.join(local_root, ".env"), "w") as h:
         h.write("SECRET=1\n")
@@ -192,7 +192,7 @@ def main():
     app.setStyleSheet(theme.stylesheet())
     pump(app, 0.6)
     shot(window, os.path.join(outdir, "03-linen-dark.png"))
-    theme.apply_preset("Nacre (cream)")
+    theme.apply_preset("Smart (cream)")
     app.setStyleSheet(theme.stylesheet())
     pump(app, 0.3)
 
@@ -203,7 +203,7 @@ def main():
     app.setStyleSheet(theme.stylesheet())
     pump(app, 0.5)
     shot(window, os.path.join(outdir, "04-custom-colours.png"))
-    theme.apply_preset("Nacre (cream)")
+    theme.apply_preset("Smart (cream)")
     app.setStyleSheet(theme.stylesheet())
     pump(app, 0.3)
 

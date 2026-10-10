@@ -1,4 +1,4 @@
-"""Nacre FTP — a modern, cream-themed FTP / FTPS / SFTP client built on PyQt5.
+"""Smart FTP — a modern, cream-themed FTP / FTPS / SFTP client built on PyQt5.
 
 The package is deliberately split so the networking layer never imports Qt:
 
@@ -12,8 +12,8 @@ The package is deliberately split so the networking layer never imports Qt:
 """
 
 __version__ = "1.0.0"
-__appname__ = "Nacre FTP"
-__orgname__ = "Nacre"
+__appname__ = "Smart FTP"
+__orgname__ = "Smart"
 __author__ = "silence"
 __author_email__ = "2446522180@qq.com"
 __copyright__ = "Copyright (c) 2026 silence"

@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Launch the Nacre FTP client.
+"""Launch the Smart FTP client.
 
     python run.py
     python run.py sftp://user@host:22
