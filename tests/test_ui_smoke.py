@@ -19,6 +19,9 @@ import time
 import traceback
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+# the connection/listing status popups are real modal dialogs; the suite checks
+# them by constructing them directly, so the automatic ones stay muted here
+os.environ.setdefault("NACRE_FTP_QUIET_DIALOGS", "1")
 os.environ.setdefault("NACRE_FTP_SETTINGS", "")   # replaced below
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -1533,6 +1536,98 @@ def main():
         check("packaging/version_info.txt exists", False, version_info)
 
     # ---------------------------------------------------------------- shutdown
+    print("\n-- connection status popups --")
+    # A failed connection used to be silent: the status message was overwritten
+    # by the refresh that follows, so the button looked like it did nothing.
+    status_boxes = []
+    original_box = window._show_status_box
+
+    def capture_box(icon, title, text, informative="", details=""):
+        status_boxes.append({"icon": int(icon), "title": title, "text": text,
+                             "info": informative, "details": details})
+        return None
+
+    window._show_status_box = capture_box
+    window._quiet_dialogs = False
+    try:
+        # a session whose login always fails
+        class _BoomSession(object):
+            connected = False
+            banner = ""
+            protocol_label = "SFTP"
+
+            def connect(self):
+                raise S.SessionError(
+                    "Authentication failed - check the user name and password")
+
+            def disconnect(self):
+                pass
+
+            def describe(self):
+                return "sftp://silence@192.168.31.142:22"
+
+        original_create = S.create_session
+        S.create_session = lambda config: _BoomSession()
+        try:
+            window._connect({"name": "boom", "protocol": "sftp",
+                             "host": "192.168.31.142", "port": 22,
+                             "user": "silence", "password": "nope"},
+                            save=False)
+        finally:
+            S.create_session = original_create
+        check("a failed connection reports exactly one dialog",
+              len(status_boxes) == 1, str(len(status_boxes)))
+        if status_boxes:
+            box = status_boxes[0]
+            check("the failure dialog is a critical box",
+                  box["icon"] == int(QMessageBox.Critical), str(box["icon"]))
+            check("the failure dialog is titled Connection failed",
+                  box["title"] == "连接失败", box["title"])
+            check("the failure dialog names the host",
+                  "192.168.31.142" in box["text"], box["text"])
+            check("the failure dialog carries the server reason",
+                  "Authentication failed" in box["info"], box["info"])
+            check("the failure dialog has copyable details",
+                  "192.168.31.142:22" in box["details"], box["details"])
+        check("no session is left behind after a failure",
+              window.session is None)
+        status_boxes.clear()
+
+        # the success popup needs a session, so check it directly
+        window.session = _BoomSession()
+        window._report_connection_success(
+            {"protocol": "sftp", "host": "192.168.31.142", "port": 22,
+             "user": "silence"})
+        check("a successful connection reports one dialog",
+              len(status_boxes) == 1, str(len(status_boxes)))
+        if status_boxes:
+            box = status_boxes[0]
+            check("the success dialog is an information box",
+                  box["icon"] == int(QMessageBox.Information),
+                  str(box["icon"]))
+            check("the success dialog is translated",
+                  box["title"] == "连接成功", box["title"])
+            check("the success dialog names host, port and protocol",
+                  "192.168.31.142:22" in box["text"]
+                  and "SFTP" in box["info"], box["info"])
+        status_boxes.clear()
+        window.session = None
+
+        # a folder that cannot be listed must also say so
+        window._on_listing_failed(window.remote_pane, "Permission denied")
+        check("a failed listing reports one dialog",
+              len(status_boxes) == 1, str(len(status_boxes)))
+        if status_boxes:
+            box = status_boxes[0]
+            check("the listing dialog is a warning",
+                  box["icon"] == int(QMessageBox.Warning), str(box["icon"]))
+            check("the listing dialog carries the reason",
+                  "Permission denied" in box["info"], box["info"])
+        status_boxes.clear()
+    finally:
+        window._show_status_box = original_box
+        window._quiet_dialogs = True
+
     print("\n-- shutdown --")
     window._save_state()
     saved = C.Settings(settings_path)

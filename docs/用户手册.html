@@ -237,11 +237,19 @@ run.cmd sftp://user@host:22/var/www        :: 直接进入指定目录</code></p
 </ol>
 <p>连接成功后：</p>
 <ul>
+<li><strong>弹窗提示「连接成功」</strong>，显示 <code>已连接到 主机:端口</code> 以及协议与用户名</li>
 <li>状态栏显示 <code>Connected to "连接名" — ftp://user@host:port</code></li>
 <li>窗口标题变成 <code>Nacre FTP [连接名]</code></li>
 <li>日志记录 <code>Connection saved to config.ini as "连接名"</code></li>
 <li>远程面板自动进入该连接上次使用的目录</li>
 </ul>
+<p><strong>连接失败一定会弹窗</strong>，不会静默失败：</p>
+<table><thead><tr><th>情况</th><th>弹窗</th></tr></thead><tbody><tr><td>主机/端口不通、被拒绝</td><td>「连接失败」+ 具体原因（如 <code>Connection refused</code>）</td></tr><tr><td>用户名或密码错误</td><td>「连接失败」+ <code>Authentication failed — check the user name and password</code></td></tr><tr><td>登录成功但无法进入任何目录</td><td>「连接失败」，并会先尝试退回到根目录 <code>/</code>；只有根目录也打不开才算失败</td></tr><tr><td>打开某个目录失败（连接之后）</td><td>「远程目录无法打开」+ 服务器返回的原因</td></tr></tbody></table>
+<p>每个弹窗都可以展开<strong>详细信息</strong>（含主机、协议、用户名、目录），方便复制反馈。</p>
+<blockquote>
+<p>说明：程序把「能列目录」当作连接成功的判据，而不是只看登录是否通过。</p>
+<p>因此像「能登录但家目录不存在」这类服务器问题也会在连接阶段就明确报出来。</p>
+</blockquote>
 <h3 id="42-用连接对话框连接">4.2 用连接对话框连接</h3>
 <p>点 <strong>Connect</strong>（连接栏为空时）或 <strong>File ▸ Connect…</strong>（<code>Ctrl+N</code>）打开对话框：</p>
 <table><thead><tr><th>字段</th><th>说明</th></tr></thead><tbody><tr><td><strong>Connection name</strong></td><td><strong>必填</strong>。连接名，留空无法确定。右侧 ↺ 恢复建议名</td></tr><tr><td><strong>Protocol</strong></td><td>FTP / FTPS / SFTP</td></tr><tr><td><strong>Host</strong></td><td>主机名或 IP</td></tr><tr><td><strong>Port</strong></td><td>端口，切换协议自动更新</td></tr><tr><td><strong>User</strong></td><td>用户名；勾选匿名登录后自动填 <code>anonymous</code></td></tr><tr><td><strong>Password</strong></td><td>密码，右侧眼睛图标可查看明文</td></tr><tr><td><strong>Private key</strong></td><td>仅 SFTP：可选的 OpenSSH 私钥文件（<code>id_rsa</code> / <code>id_ed25519</code> 等）</td></tr><tr><td><strong>Log in anonymously</strong></td><td>匿名登录</td></tr><tr><td><strong>Save this connection to config.ini</strong></td><td>默认勾选；取消勾选则本次连接不写入文件</td></tr></tbody></table>
@@ -596,10 +604,10 @@ order = Production web server,Backup NAS</code></pre>
 <hr>
 <h2 id="14-已知限制">14. 已知限制</h2>
 <ol>
-<li><strong>SFTP 未在真实 SSH 服务器上做过端到端验证</strong>。本机没有可用的 sshd，</li>
+<li><strong>SFTP 已在真实服务器上验证</strong>：OpenSSH 9.9（Ubuntu，<code>silence@192.168.31.142:22</code>）</li>
 </ol>
-<p>   代码路径完整（密码登录、私钥登录、keepalive、主机密钥校验），接口与 FTP</p>
-<p>   完全一致，但请在自己的服务器上确认一次。</p>
+<p>   密码登录、目录列表、权限列均实测通过。私钥登录、keepalive、严格主机密钥校验</p>
+<p>   这几条路径仍建议在自己的服务器上确认一次。</p>
 <ol>
 <li><strong>FTP 并发实际被串行化</strong>。同一条 FTP 控制连接不能并行传多个文件，</li>
 </ol>

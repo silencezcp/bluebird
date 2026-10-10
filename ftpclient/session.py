@@ -1324,7 +1324,6 @@ class SFTPSession(BaseSession):
 
     # -- listing --------------------------------------------------------
     def listdir(self, path: Optional[str] = None) -> List[Entry]:
-        self._sync_control()
         with self.lock:
             target = path if path is not None else (self._cwd or ".")
             try:
@@ -1519,7 +1518,6 @@ class SFTPSession(BaseSession):
     def upload_file(self, local_path: str, remote_name: str,
                     progress: ProgressFn = None,
                     control: Optional[TransferControl] = None) -> int:
-        self._sync_control()
         try:
             total: Optional[int] = os.path.getsize(local_path)
         except OSError:

@@ -264,6 +264,11 @@ class MainWindow(QMainWindow):
         self._flush_scheduled = False
         #: "Yes to all" applies to the current batch only, then resets
         self._overwrite_all = False
+        #: the test suite runs windowless, so it can mute the status dialogs
+        self._quiet_dialogs = bool(
+            os.environ.get("NACRE_FTP_QUIET_DIALOGS", ""))
+        #: the last connection error, kept for the tests and the status line
+        self._last_connection_error = ""
         # a member timer (not a bare singleShot) so it can be cancelled when
         # the window closes or a test wants a deterministic flush
         self._flush_timer = QTimer(self)
@@ -673,6 +678,26 @@ class MainWindow(QMainWindow):
         if self.port_edit.text().strip() in ("", "21", "22"):
             self.port_edit.setText(str(self._default_port()))
 
+    def _report_connection_success(self, config: Dict[str, Any]) -> None:
+        """Confirm a completed connection with a short popup."""
+        if self.session is None:
+            return
+        host = config.get("host", "?")
+        port = config.get("port")
+        target = "%s:%s" % (host, port) if port else str(host)
+        protocol = str(config.get("protocol", "ftp")).upper()
+        user = config.get("user") or "anonymous"
+        try:
+            folder = self.remote_pane.path or "/"
+        except Exception:
+            folder = "/"
+        self._show_status_box(
+            QMessageBox.Information, T("Connected"),
+            T("Connected to %s.") % target,
+            "%s · %s@%s" % (protocol, user, target),
+            "%s: %s\n%s: %s\n%s: %s"
+            % (T("Folder"), folder, T("User"), user, T("Protocol"), protocol))
+
     def connect_to_server(self) -> None:
         config = self._config_from_bar()
         if not config.get("host"):
@@ -682,6 +707,7 @@ class MainWindow(QMainWindow):
             config["name"] = _config.default_connection_name(config)
             self.name_edit.setText(config["name"])
         self._connect(config)
+        self._report_connection_success(config)
 
     def open_connect_dialog(self, values: Optional[Dict[str, Any]] = None) -> None:
         dialog = ConnectDialog(self.settings, self, values or self._config_from_bar(),
@@ -729,6 +755,63 @@ class MainWindow(QMainWindow):
         self.user_edit.setText(str(config.get("user", "")))
         self.password_edit.setText(str(config.get("password", "")))
 
+    def _show_status_box(self, icon: Any, title: str, text: str,
+                         informative: str = "", details: str = "") -> Any:
+        """Show a small modal status dialog and return it.
+
+        Kept in one place so the three connection/listing reports look alike,
+        and so the test suite has a single seam to observe them through.
+        """
+        if self._quiet_dialogs:
+            return None
+        box = QMessageBox(self)
+        box.setIcon(icon)
+        box.setWindowTitle(title)
+        box.setText(text)
+        if informative:
+            box.setInformativeText(informative)
+        if details:
+            box.setDetailedText(details)
+        box.setStandardButtons(QMessageBox.Ok)
+        localise_box(box)
+        box.exec_()
+        return box
+
+    def _report_connection_failure(self, config: Dict[str, Any],
+                                   message: str) -> None:
+        """Tell the user, loudly, that a connection attempt failed.
+
+        A silent failure is the worst outcome: the button seemed to do
+        nothing.  The dialog carries the details so the exact server reply can
+        be copied, and the log keeps the full history.
+        """
+        host = config.get("host", "?")
+        port = config.get("port")
+        target = "%s:%s" % (host, port) if port else str(host)
+        self._last_connection_error = message
+        self._show_status_box(
+            QMessageBox.Critical, T("Connection failed"),
+            T("Could not connect to %s.") % target, message,
+            "%s\n%s: %s\n%s: %s\n%s: %s"
+            % (T("The server reported:"), T("Host"), target,
+               T("Protocol"), str(config.get("protocol", "ftp")).upper(),
+               T("User"), config.get("user") or "anonymous"))
+
+    def _abandon_session(self, session: Any, config: Dict[str, Any],
+                         message: str) -> None:
+        """Drop a session that logged in but cannot be used."""
+        self.log("error", "Connection unusable: %s" % message)
+        try:
+            session.disconnect()
+        except Exception:
+            pass
+        self.session = None
+        self.remote_pane.set_session(None)
+        self.connect_button.setEnabled(True)
+        self.disconnect_button.setEnabled(False)
+        self._refresh_status()
+        self._report_connection_failure(config, message)
+
     def _connect(self, config: Dict[str, Any], save: bool = True) -> None:
         if self.session is not None:
             self.disconnect_server(silent=True)
@@ -744,10 +827,36 @@ class MainWindow(QMainWindow):
             message = human_error(exc)
             self.log("error", "Connection failed: %s" % message)
             self._refresh_status()
-            QMessageBox.critical(self, "Connection failed",
-                                 "Could not connect to %s.\n\n%s"
-                                 % (config.get("host"), message))
+            self._report_connection_failure(config, message)
             return
+
+        # A successful login is not yet a usable session: the first directory
+        # listing is what really proves it.  Doing it here means a failure is
+        # reported by the connection dialog instead of vanishing into the log.
+        start = str(config.get("remote_dir")
+                    or self.settings.get("behavior", "last_remote_dir", "/")
+                    or "/")
+        try:
+            session.chdir(start)
+        except Exception as exc:  # noqa: BLE001
+            message = human_error(exc)
+            if start != "/":
+                # the remembered directory may be gone; the account itself can
+                # still be fine, so fall back to the root before giving up
+                try:
+                    session.chdir("/")
+                    start = "/"
+                    self.log("warn", "Could not open %s, using / instead: %s"
+                             % (start, message))
+                except Exception:
+                    QApplication.restoreOverrideCursor()
+                    self._abandon_session(session, config, message)
+                    return
+            else:
+                QApplication.restoreOverrideCursor()
+                self._abandon_session(session, config, message)
+                return
+
         QApplication.restoreOverrideCursor()
         self.session = session
         self.connection_config = config
@@ -769,9 +878,6 @@ class MainWindow(QMainWindow):
         self.settings.push_recent("saved://%s" % config.get("name", ""))
         self._refresh_recent_menu()
 
-        start = str(self.settings.get("behavior", "last_remote_dir", "/") or "/")
-        if config.get("remote_dir"):
-            start = str(config["remote_dir"])
         if not self.remote_pane.navigate(start) and start != "/":
             self.remote_pane.navigate("/")
         self._refresh_status()
@@ -818,6 +924,7 @@ class MainWindow(QMainWindow):
             site = dict(dialog.selected_site)
             self._config_to_bar(site)
             self._connect(site)
+            self._report_connection_success(site)
 
     def _refresh_recent_menu(self) -> None:
         if not hasattr(self, "menu"):
@@ -856,6 +963,7 @@ class MainWindow(QMainWindow):
         """Reconnect straight from config.ini, password included."""
         self._config_to_bar(site)
         self._connect(site)
+        self._report_connection_success(site)
 
     def _connect_recent(self, entry: str) -> None:
         if entry.startswith("saved://"):
@@ -893,8 +1001,21 @@ class MainWindow(QMainWindow):
             self.remote_pane.select_names(failed)
 
     def _on_listing_failed(self, pane: FilePane, message: str) -> None:
+        """A directory could not be listed - show it, do not just log it.
+
+        This used to write to the log and a status message, and the status
+        message was immediately overwritten by the refresh that follows a
+        connection, so a failure looked like nothing happening at all.
+        """
         self.log("error", "%s pane: %s" % (pane.title, message))
         self.status.showMessage(message, 6000)
+        title = T("Cannot open the folder")
+        if not pane.local:
+            title = T("Remote folder unavailable")
+        self._show_status_box(
+            QMessageBox.Warning, title,
+            T("Could not open “%s”.") % (pane.path or T("folder")), message,
+            "%s: %s" % (T("Folder"), pane.path or "-"))
 
     def _on_activated(self, pane: FilePane, entry: Entry) -> None:
         if entry.is_dir:

@@ -368,6 +368,32 @@ def main():
         ended = ftp.listdir()
         check("usable after reconnect", any(e.name == "readme.txt" for e in ended))
 
+        print("\n-- the two session classes stay separate --")
+        # A patch once added an FTP-only helper call to SFTPSession.listdir(),
+        # which broke every SFTP connection with an AttributeError the UI
+        # swallowed.  These checks catch that class of mistake without needing
+        # a real SSH server.
+        import inspect
+        import re as _re
+        ftp_only = ("_sync_control", "_drain_control", "_begin_transfer",
+                    "_finish_command", "_remote_size", "_pasv_socket")
+        sftp_source = inspect.getsource(S.SFTPSession)
+        leaked = [name for name in ftp_only
+                  if ("self.%s(" % name) in sftp_source]
+        check("SFTPSession does not call FTP-only helpers", not leaked,
+              str(leaked))
+        check("the FTP helpers live on FTPSession",
+              all(hasattr(S.FTPSession, name) for name in ftp_only))
+        check("SFTPSession has none of them",
+              not any(hasattr(S.SFTPSession, name) for name in ftp_only))
+        # every private helper a class calls must exist on that class
+        for cls in (S.FTPSession, S.SFTPSession):
+            called = set(_re.findall(r"self\.(_[a-z_]+)\(", 
+                                     inspect.getsource(cls)))
+            missing = sorted(name for name in called if not hasattr(cls, name))
+            check("%s only calls methods it has" % cls.__name__, not missing,
+                  str(missing))
+
     except Exception:
         traceback.print_exc()
         FAILED.append(("unexpected exception", traceback.format_exc()))
