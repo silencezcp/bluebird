@@ -28,7 +28,7 @@ try:
     sys.path.insert(0, ROOT)
     from ftpclient import __author__, __version__ as _VERSION
 except Exception:                                # pragma: no cover
-    __author__, _VERSION = "silence", "1.36.1"
+    __author__, _VERSION = "silence", "1.36.2"
 
 #: The two books.  The user manual is the one that ships inside the
 #: executable's docs/ folder; the developer manual never leaves the repository.

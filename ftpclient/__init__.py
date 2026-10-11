@@ -16,7 +16,7 @@ The package is deliberately split so the networking layer never imports Qt:
     ftpclient.app      - GUI entry point
 """
 
-__version__ = "1.36.1"
+__version__ = "1.36.2"
 __appname__ = "BlueBird"
 #: The Chinese name, shown alongside the English one in the interface.  It is
 #: not translated: 青鸟 is the product name, not a description.
@@ -40,3 +40,38 @@ def display_name(language: str = "") -> str:
 AUTHORS = (
     ("silence", "author, design and code"),
 )
+
+
+def boot_if_main(name: str) -> None:
+    """Run *name* correctly when someone starts a package file directly.
+
+    Every module here uses relative imports (``from . import config``), so
+    running one on its own - which is what right-clicking a file in an IDE and
+    choosing Run does - fails with::
+
+        ImportError: attempted relative import with no known parent package
+
+    That message says nothing about the actual fix.  Calling this at the top of a
+    module detects the situation and re-runs the file as the module it is,
+    ``python -m ftpclient.<name>``, which is what the caller meant.  Nothing
+    happens on a normal import, so the cost when running the application
+    properly is one comparison.
+    """
+    if __name__ != "__main__" or __package__:
+        return
+    import os
+    import runpy
+    import sys
+
+    # this file is <project>/ftpclient/__init__.py, so the project is two up
+    project = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    if project not in sys.path:
+        sys.path.insert(0, project)
+    target = "ftpclient.%s" % name
+    sys.stderr.write(
+        "%s.py was started directly; re-running it as '%s -m %s' instead.\n"
+        "To start the application, use run.py or '%s -m ftpclient'.\n"
+        % (name, os.path.basename(sys.executable), target,
+           os.path.basename(sys.executable)))
+    raise SystemExit(runpy.run_module(target, run_name="__main__", alter_sys=True))
+

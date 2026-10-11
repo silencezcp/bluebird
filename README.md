@@ -1,6 +1,6 @@
 # 青鸟 BlueBird — 现代奶白色 FTP / FTPS / SFTP 客户端
 
-**作者：silence** ｜ 版本 1.36.1
+**作者：silence** ｜ 版本 1.36.2
 
 基于 **Python 3.8.3 + PyQt5 5.15.11 + PyQtWebEngine 5.15.7 + paramiko** 实现的
 FTP/SFTP 双栏客户端，界面参考 **FileZilla Client** 的信息架构，但换成现代奶白色
@@ -42,6 +42,27 @@ run.cmd
 
 ```bat
 D:\DSH_Workspaces\Ftp\python.exe run.py
+```
+
+在 **PyCharm** 里运行：
+
+| 方式 | 怎么操作 |
+|---|---|
+| ✅ **推荐** | 直接用**已内置的运行配置 `BlueBird`**（`.idea\runConfigurations\BlueBird.xml`，打开工程后工具栏里就能选），它指向 `run.py` |
+| ✅ 命令行 | `python run.py` 或 `python -m ftpclient` |
+| ❌ **不要** | 右键 `ftpclient\` 里的某个文件选 Run |
+
+包内模块用的是相对导入（`from . import config`），**单独运行必然失败**。如果你这样跑过，看到的是：
+
+```
+ImportError: attempted relative import with no known parent package
+```
+
+这句话并没有说明怎么修，所以现在每个模块都会自己识别这种情况并给出正确命令：
+
+```
+Starting app.py directly; running it as 'python -m ftpclient.app' instead.
+  (ftpclient.app has no main entry point; start the client with run.py)
 ```
 
 也支持用 URL 直接发起连接（会带着参数打开连接对话框）：

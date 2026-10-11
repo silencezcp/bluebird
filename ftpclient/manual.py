@@ -16,6 +16,26 @@ from PyQt5.QtWidgets import (QAction, QHBoxLayout, QLabel, QMainWindow,
                              QMessageBox, QPushButton, QSizePolicy,
                              QToolBar, QVBoxLayout, QWidget)
 
+if __name__ == "__main__" and not __package__:
+    # Started directly: right-clicking this file in an IDE, or running
+    # `python ftpclient/manual.py`.  Every module in this package uses relative
+    # imports, which cannot work that way, and the resulting "attempted
+    # relative import with no known parent package" says nothing useful.
+    # Re-run the file as the module it is, from the project root.
+    import os
+    import runpy
+    import sys
+
+    sys.path.insert(0, os.path.dirname(os.path.dirname(
+        os.path.abspath(__file__))))
+    sys.stderr.write("Starting manual.py directly; running it as "
+                     "'python -m ftpclient.manual' instead.\n")
+    runpy.run_module("ftpclient.manual", run_name="__main__", alter_sys=True)
+    # A library module has no main block, so nothing above ran.  Say so rather
+    # than exiting silently.  Start the application with run.py.
+    sys.stderr.write("  (ftpclient.manual has no main entry point; "
+                     "start the client with run.py)\n")
+    raise SystemExit(0)
 from . import __appname__, __version__
 from . import resources
 from .i18n import T

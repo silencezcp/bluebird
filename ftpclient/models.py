@@ -26,6 +26,26 @@ except ImportError:                      # the command line client needs no Qt
     QModelIndex = Qt = QVariant = None    # type: ignore[assignment]
     QFont = QIcon = None                  # type: ignore[assignment]
 
+if __name__ == "__main__" and not __package__:
+    # Started directly: right-clicking this file in an IDE, or running
+    # `python ftpclient/models.py`.  Every module in this package uses relative
+    # imports, which cannot work that way, and the resulting "attempted
+    # relative import with no known parent package" says nothing useful.
+    # Re-run the file as the module it is, from the project root.
+    import os
+    import runpy
+    import sys
+
+    sys.path.insert(0, os.path.dirname(os.path.dirname(
+        os.path.abspath(__file__))))
+    sys.stderr.write("Starting models.py directly; running it as "
+                     "'python -m ftpclient.models' instead.\n")
+    runpy.run_module("ftpclient.models", run_name="__main__", alter_sys=True)
+    # A library module has no main block, so nothing above ran.  Say so rather
+    # than exiting silently.  Start the application with run.py.
+    sys.stderr.write("  (ftpclient.models has no main entry point; "
+                     "start the client with run.py)\n")
+    raise SystemExit(0)
 from .core import (  # noqa: F401  (re-exported for existing callers)
     ENTRY_ROLE, FILE_COLUMNS, ITEM_ID_ROLE, KIND_ROLE, SORT_ROLE,
     Entry, TransferItem, format_size, format_time, parse_size,
