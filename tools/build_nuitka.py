@@ -94,7 +94,7 @@ def app_version() -> str:
         from ftpclient import __version__
         return __version__
     except Exception:                              # noqa: BLE001
-        return "1.29.0"
+        return "1.30.0"
 
 
 # ---------------------------------------------------------------------------

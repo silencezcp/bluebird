@@ -1546,8 +1546,12 @@ def main():
         text = open(version_info, encoding="utf-8").read()
         check("the version resource names the author",
               "silence" in text, "")
-        check("the version resource carries the version",
-              "1.0.0" in text, "")
+        # compare against the package rather than a literal: the version is
+        # bumped on every release and a hardcoded one silently goes stale
+        from ftpclient import __version__ as package_version
+        check("the version resource carries the package version",
+              package_version in text,
+              "resource has no %r" % package_version)
     else:
         check("packaging/version_info.txt exists", False, version_info)
 
