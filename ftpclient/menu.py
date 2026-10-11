@@ -99,6 +99,9 @@ class MainMenu(object):
         server_menu.addSeparator()
         server_menu.addAction(self.act("remote_mkdir", "Create &directory…",
                                        "F7", "new_folder"))
+        server_menu.addAction(self.act("remote_mkdir_enter",
+                                       "Create directory and &enter…",
+                                       "", "new_folder"))
         server_menu.addAction(self.act("remote_rename", "&Rename…", "F2",
                                        "rename"))
         server_menu.addAction(self.act("remote_delete", "&Delete", "Del",

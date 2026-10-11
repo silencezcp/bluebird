@@ -837,7 +837,61 @@ def main():
                     if a.text()]
     check("the context menu is English again after switching",
           any(label == "Refresh" for label in english_menu), str(english_menu))
+
+    print("\n-- create a folder and enter it --")
+    # the menu entry and the handler behind it, in both panes
+    check("the local menu offers create-and-enter",
+          any("新建文件夹并进入" in label for label in local_labels),
+          str(local_labels))
+    # the remote menu only lists its create actions while connected, so this is
+    # asserted on the same condition as the translation check above
+    if window.session is not None and window.session.connected:
+        check("the remote menu offers create-and-enter",
+              any("新建目录并进入" in label for label in remote_labels),
+              str(remote_labels))
+    else:
+        check("a disconnected remote menu has no create action to offer",
+              not any("新建" in label for label in remote_labels),
+              str(remote_labels))
+    check("the English menu names it",
+          any(label.startswith("Create folder and enter")
+              for label in english_menu), str(english_menu))
+    check("the local handler and the remote handler both exist",
+          callable(getattr(window, "local_mkdir_enter", None))
+          and callable(getattr(window, "remote_mkdir_enter", None)))
     I18N.set_language("zh", notify=True)
+
+    # drive the real handler: make a folder and land inside it
+    enter_root = os.path.join(workdir, "enter-test")
+    os.makedirs(enter_root, exist_ok=True)
+    window.local_pane.navigate(enter_root)
+    from PyQt5.QtWidgets import QInputDialog as _QID
+    real_get_text = _QID.getText
+    _QID.getText = staticmethod(lambda *a, **k: ("made-by-test", True))
+    try:
+        window.local_mkdir_enter()
+        target = os.path.join(enter_root, "made-by-test")
+        check("create-and-enter makes the folder",
+              os.path.isdir(target), target)
+        check("create-and-enter goes into it",
+              os.path.abspath(window.local_pane.path) == os.path.abspath(target),
+              window.local_pane.path)
+
+        # from the parent again, the same name must enter, not fail
+        window.local_pane.navigate(enter_root)
+        window.local_mkdir_enter()
+        check("an existing folder is entered rather than refused",
+              os.path.abspath(window.local_pane.path) == os.path.abspath(target),
+              window.local_pane.path)
+
+        # a cancelled prompt must leave everything alone
+        _QID.getText = staticmethod(lambda *a, **k: ("", False))
+        here = window.local_pane.path
+        window.local_mkdir_enter()
+        check("cancelling create-and-enter changes nothing",
+              window.local_pane.path == here, window.local_pane.path)
+    finally:
+        _QID.getText = real_get_text
 
     print("\n-- swap the two panes --")
     splitter = window.site_splitter

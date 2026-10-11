@@ -1094,6 +1094,9 @@ class MainWindow(QMainWindow):
                                T("Upload to the server"), self.upload_selection)
             menu.addAction(self.icons.action_icon("new_folder", size=18),
                            T("Create folder…"), self.local_mkdir)
+            menu.addAction(self.icons.action_icon("new_folder", size=18),
+                           T("Create folder and enter…"),
+                           self.local_mkdir_enter)
             menu.addAction(self.icons.action_icon("refresh", size=18),
                            T("Refresh"), pane.refresh)
             if entries:
@@ -1112,6 +1115,9 @@ class MainWindow(QMainWindow):
             if self.session is not None and self.session.connected:
                 menu.addAction(self.icons.action_icon("new_folder", size=18),
                                T("Create directory…"), self.remote_mkdir)
+                menu.addAction(self.icons.action_icon("new_folder", size=18),
+                               T("Create directory and enter…"),
+                               self.remote_mkdir_enter)
                 menu.addAction(self.icons.action_icon("new_file", size=18),
                                T("Create empty file…"), self.remote_new_file)
                 menu.addAction(self.icons.action_icon("refresh", size=18),
@@ -1543,15 +1549,45 @@ class MainWindow(QMainWindow):
                                         T("Folder name:"))
         if not ok or not name.strip():
             return
-        path = os.path.join(self.local_pane.path, name.strip())
+        name = name.strip()
+        path = os.path.join(self.local_pane.path, name)
         try:
-            os.makedirs(path)
+            os.makedirs(path, exist_ok=True)
         except OSError as exc:
             QMessageBox.warning(self, "Create folder", human_error(exc))
             return
         self.local_pane.refresh()
-        self.local_pane.select_names([name.strip()])
+        self.local_pane.select_names([name])
         self.log("success", "Created %s" % path)
+
+    def local_mkdir_enter(self) -> None:
+        """Create a folder and go straight into it.
+
+        One step instead of two, which is the usual intent: the folder is made
+        so that its contents can be worked on.  An existing folder is entered
+        rather than reported as an error.
+        """
+        name, ok = QInputDialog.getText(self, T("Create folder and enter"),
+                                        T("Folder name:"))
+        if not ok or not name.strip():
+            return
+        name = name.strip()
+        path = os.path.join(self.local_pane.path, name)
+        existed = os.path.isdir(path)
+        try:
+            os.makedirs(path, exist_ok=True)
+        except OSError as exc:
+            QMessageBox.warning(self, "Create folder", human_error(exc))
+            return
+        if existed:
+            self.log("info", "%s already exists, entering it" % path)
+        else:
+            self.log("success", "Created %s" % path)
+        if not self.local_pane.navigate(path):
+            QMessageBox.warning(self, "Create folder",
+                                T("Could not open %s") % path)
+            return
+        self.log("info", "Local pane is now in %s" % path)
 
     def local_rename(self) -> None:
         entry = self.local_pane.first_selected()
@@ -1614,14 +1650,50 @@ class MainWindow(QMainWindow):
                                         T("Directory name:"))
         if not ok or not name.strip():
             return
+        name = name.strip()
         try:
-            self.session.mkdir(name.strip())
+            self.session.mkdir(name)
         except SessionError as exc:
             QMessageBox.warning(self, "Create directory", exc.message)
             return
         self.remote_pane.refresh()
-        self.remote_pane.select_names([name.strip()])
-        self.log("success", "Created %s" % self._remote_join(name.strip()))
+        self.remote_pane.select_names([name])
+        self.log("success", "Created %s" % self._remote_join(name))
+
+    def remote_mkdir_enter(self) -> None:
+        """Create a directory on the server and go into it.
+
+        A directory that is already there is entered instead of failing, so the
+        action is safe to repeat.
+        """
+        if not self._require_session():
+            return
+        name, ok = QInputDialog.getText(self, T("Create directory and enter"),
+                                        T("Directory name:"))
+        if not ok or not name.strip():
+            return
+        name = name.strip()
+        try:
+            listed = {entry.name for entry in self.session.listdir()}
+        except SessionError:
+            listed = set()
+        existed = name in listed
+        if not existed:
+            try:
+                self.session.mkdir(name)
+            except SessionError as exc:
+                QMessageBox.warning(self, "Create directory", exc.message)
+                return
+            self.log("success", "Created %s" % self._remote_join(name))
+        else:
+            self.log("info", "%s already exists, entering it"
+                     % self._remote_join(name))
+        if not self.remote_pane.navigate(self._remote_join(name)):
+            QMessageBox.warning(self, "Create directory",
+                                T("Could not open %s") % self._remote_join(name))
+            return
+        self.log("info", "Remote pane is now in %s"
+                 % self._remote_join(name))
 
     def remote_new_file(self) -> None:
         if not self._require_session():
@@ -1960,6 +2032,7 @@ class MainWindow(QMainWindow):
             "refresh_local": lambda: self.local_pane.refresh(force=True),
             "refresh_remote": lambda: self.remote_pane.refresh(force=True),
             "remote_mkdir": self.remote_mkdir,
+            "remote_mkdir_enter": self.remote_mkdir_enter,
             "remote_rename": self.remote_rename,
             "remote_delete": self.remote_delete,
             "upload": self.upload_selection,

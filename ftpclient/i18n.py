@@ -565,6 +565,14 @@ ZH: Dict[str, str] = {
         "这些扩展名的文件以**文本（ASCII）**方式传输，而不是逐字节。\n\nASCII 会**转换换行符**：下载时把服务器的 CRLF 转为 LF，上传时把 LF 转为 CRLF。这正是 Windows 的 `\\r\\n` 与 Linux 的 `\\n` 差异所需，但它会**破坏非纯文本文件**，所以列表宜短。\n\n空则全部按二进制传输。",
     "Open the &log folder":
         "打开日志文件夹(&L)",
+    "Create folder and enter":
+        "新建文件夹并进入",
+    "Create folder and enter…":
+        "新建文件夹并进入(&E)…",
+    "Create directory and enter…":
+        "新建目录并进入(&E)…",
+    "Create directory and &enter…":
+        "新建目录并进入(&E)…",
 }
 
 
