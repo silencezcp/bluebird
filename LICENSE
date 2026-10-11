@@ -1,36 +1,5 @@
-BlueBird - a modern cream-themed FTP / FTPS / SFTP client
-Copyright (C) 2026 silence
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>.
-
-The full licence text follows.  Note why this project is under the GPL:
-it is built on PyQt5 and PyQtWebEngine, which Riverbank Computing licenses
-under the GPL v3 or a commercial licence.  Distributing BlueBird under the
-GPL is what makes that use compliant.
-
-    BlueBird
+    BlueBird - a modern cream-themed FTP / FTPS / SFTP client
     Copyright (C) 2026 silence
-
-    This program comes with ABSOLUTELY NO WARRANTY; for details see the
-    licence below.  This is free software, and you are welcome to
-    redistribute it under certain conditions; see the licence below for
-    details.
-
-Third party components are listed in THIRD-PARTY-NOTICES.txt, which must
-accompany any distribution of the binaries.
-
-Source: https://github.com/silencezcp/bluebird
 
 GNU GENERAL PUBLIC LICENSE
                        Version 3, 29 June 2007
@@ -653,3 +622,44 @@ Program, unless a warranty or assumption of liability accompanies a
 copy of the Program in return for a fee.
 
                      END OF TERMS AND CONDITIONS
+
+
+==============================================================================
+APPENDIX - why this project is licensed this way, and what it is built on
+==============================================================================
+
+The licence above applies to BlueBird.  The program name and copyright line
+have been added to it as the GNU GPL itself instructs ("How to Apply These
+Terms to Your New Programs").
+
+Why the GPL
+-----------
+
+BlueBird is built on PyQt5 and PyQtWebEngine.  Riverbank Computing licenses
+those under the GNU GPL version 3 or a commercial licence, at your choice.
+Distributing BlueBird under the GPL is what makes that use compliant.  A build
+that is distributed as closed source would instead need the commercial licence
+from Riverbank.
+
+The Qt libraries that ship alongside (PyQt5-Qt5, PyQtWebEngine-Qt5) are used
+under the LGPL option.  They are installed as separate DLLs next to the
+executable rather than linked into it, which is the arrangement the LGPL asks
+for, and their licence texts are in THIRD-PARTY-NOTICES.txt.
+
+Third-party components
+----------------------
+
+THIRD-PARTY-NOTICES.txt, beside this file, reproduces or points to the licence
+of every dependency, with the exact terms read from each package rather than
+copied from memory.  It must accompany any distribution of the binaries, as
+MIT, BSD, Apache-2.0, PSF and LGPL all require their licence text to travel
+with the program.
+
+Source
+------
+
+    https://github.com/silencezcp/bluebird
+
+This program comes with ABSOLUTELY NO WARRANTY, to the extent permitted by
+law.  It is free software, and you are welcome to redistribute it under the
+conditions of the GNU General Public License above.
