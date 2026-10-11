@@ -91,16 +91,20 @@ run.cmd ftp://user@192.168.1.10
 
 | 文件 | 内容 |
 |---|---|
-| `LICENSE` | **GPL-3.0**：项目声明 + **GPL 全文**（33 KB），随 exe 分发 |
-| `THIRD-PARTY-NOTICES.txt` | 各依赖的**协议全文**（112 KB），随 exe 分发 |
+| `LICENSE` | **GPL-3.0**：项目声明（名称/版权/免责）+ **GPL 全文**（33 KB），随 exe 分发 |
+| `THIRD-PARTY-NOTICES.txt` | 本项目授权说明 + 各依赖的**协议全文**（113 KB），随 exe 分发 |
 
 **为什么本项目必须是 GPL-3.0**：`PyQt5` / `PyQtWebEngine` 是 GPL-3.0 或商业授权
 二选一，以 GPL 分发即合规。**若要闭源分发，必须购买 Riverbank 商业授权。**
 
+> **`LICENSE` 只放 GPL 原文**（加开头那几行 GPL 自己要求的声明），**不放补充说明**
+> —— GitHub 按文件内容匹配协议来分类，混入额外段落会让它判成 "Other"。
+> 项目的授权说明因此放在 `THIRD-PARTY-NOTICES.txt` 开头。
+>
 > GPL 全文取自本机已安装的 **Qt 运行时 wheel**
 > （`PyQt5_Qt5-5.15.2.dist-info/LICENSE`），是权威原文而非手打。第三方协议全文
-> 同样**从各 wheel 自带的文件复制**，不凭记忆重写；其中 Qt 那份文件里与
-> `LICENSE` 重复的 GPL-3.0 段落已改为指向 `LICENSE`（否则白占 32 KB）。
+> 同样**从各 wheel 自带的文件复制**；其中 Qt 那份文件里与 `LICENSE` 重复的
+> GPL-3.0 段落已改为指向 `LICENSE`（否则白占 32 KB）。
 
 两个文件都已写进 `packaging/BlueBird.spec`，会出现在 `dist\BlueBird\` 里 ——
 MIT / BSD / Apache-2.0 / LGPL 都要求**协议全文随二进制分发**。
@@ -108,8 +112,9 @@ MIT / BSD / Apache-2.0 / LGPL 都要求**协议全文随二进制分发**。
 重新生成：
 
 ```bat
-D:\DSH_Workspaces\Ftp\python.exe tools\make_notices.py          :: 第三方协议全文
-D:\DSH_Workspaces\Ftp\python.exe tools\make_notices.py --report  :: 只看找到哪些
+D:\DSH_Workspaces\Ftp\python.exe tools\make_license.py           :: LICENSE
+D:\DSH_Workspaces\Ftp\python.exe tools\make_notices.py           :: 第三方协议全文
+D:\DSH_Workspaces\Ftp\python.exe tools\make_notices.py --report   :: 只看找到哪些
 ```
 
 三个关键传递依赖不能省：
