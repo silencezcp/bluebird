@@ -27,13 +27,49 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 from PyQt5.QtCore import QObject, QRunnable, QThreadPool, QTimer, pyqtSignal
 
 from . import session as _session
-from .core import Entry, TransferItem
+from .core import Entry, TransferItem, format_size
 
 #: transfers slower than this tick are still reported at least twice a second
 REPORT_INTERVAL = 0.2
 
 #: the largest number of simultaneous transfers the preference accepts
 MAX_CONCURRENCY = 16
+
+
+def describe_item(item: TransferItem) -> str:
+    """The transfer pane's line for one item, as used in the log.
+
+    The pane shows name, direction, size and status; the log keeps the same
+    facts and adds both full paths, because that is what is needed to work out
+    afterwards which file went where.  A single line, because the log folds
+    multi-line messages onto one line anyway.
+    """
+    arrow = "->" if item.kind == "upload" else "<-"
+    size = "folder" if item.is_dir else (
+        format_size(int(item.size or 0)) or "unknown size")
+    # source is always the local path for an upload and the remote path for a
+    # download; target is the other end
+    if item.kind == "upload":
+        return "%s %s %s (%s)  local: %s  ->  remote: %s" % (
+            item.kind.upper(), arrow, size, item.display_name,
+            item.source, item.target)
+    return "%s %s %s (%s)  remote: %s  ->  local: %s" % (
+        item.kind.upper(), arrow, size, item.display_name,
+        item.source, item.target)
+
+
+def describe_result(item: TransferItem, elapsed: float) -> str:
+    """How a finished transfer reads in the log."""
+    if item.status == "done":
+        done = int(item.transferred or item.size or 0)
+        parts = [format_size(done) or "done"]
+        if elapsed > 0.05:
+            parts.append("%s/s" % (format_size(int(done / elapsed)) or "?"))
+            parts.append("%.1f s" % elapsed)
+        return ", ".join(parts)
+    if item.status == "cancel":
+        return "cancelled"
+    return "failed"
 
 
 class TransferWorker(QRunnable):
@@ -69,6 +105,9 @@ class TransferWorker(QRunnable):
         item.started_at = time.time()
         item.speed = 0.0
         manager.item_updated.emit(item.uid)
+        # the pane gains a row here, so the log gains a line: without this the
+        # transfer list was visible on screen and nowhere on disk
+        manager.log.emit("info", "Started: %s" % describe_item(item))
         try:
             if item.is_dir:
                 self._run_directory()
@@ -213,6 +252,15 @@ class TransferManager(QObject):
                 self.total_bytes += int(item.size or 0)
         for item in items:
             self.item_added.emit(item.uid)
+        # everything the pane is about to show is written down as well, so a
+        # batch is identifiable from the log alone.  Only the paths are
+        # recorded; the outcome arrives when each file settles.
+        for item in items:
+            arrow = "->" if item.kind == "upload" else "<-"
+            kind = "folder" if item.is_dir else (
+                format_size(int(item.size or 0)) or "unknown size")
+            self.log.emit("info", "Queued %s %s %s  (%s -> %s)"
+                          % (item.kind, arrow, kind, item.source, item.target))
         self.queue_changed.emit()
         self.stats_changed.emit()
         return len(items)
@@ -393,6 +441,21 @@ class TransferManager(QObject):
         self.item_updated.emit(item.uid)
         self.queue_changed.emit()
         self.stats_changed.emit()
+        if retry:
+            self.log.emit("warn", "Retrying (%d/%d) %s - %s"
+                          % (item.retries, self.retries(),
+                             item.display_name, item.message))
+        elif item.status in ("done", "cancel", "error"):
+            elapsed = (item.finished_at or 0.0) - (item.started_at or 0.0)
+            level = {"done": "success", "cancel": "warn"}.get(
+                item.status, "error")
+            detail = describe_result(item, elapsed)
+            if item.status == "error" and item.message:
+                detail = "%s - %s" % (detail, item.message)
+            self.log.emit(level, "%s %s - %s" % (
+                {"done": "Finished", "cancel": "Cancelled"}.get(
+                    item.status, "Failed"),
+                item.display_name, detail))
         if settled:
             # reported only once the item will not be retried any more
             self.item_finished.emit(item.uid)

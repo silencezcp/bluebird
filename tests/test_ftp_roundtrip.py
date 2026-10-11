@@ -703,6 +703,81 @@ def main():
         check("a bad log folder is reported once", bool(blocked.error))
         blocked.close()
 
+        print("\n-- the queue writes what the pane shows --")
+        # The pane used to be the only place a transfer was visible: the queue
+        # emitted no log lines at all, so a finished batch left nothing on disk.
+        from ftpclient.transfer import describe_item, describe_result
+
+        up = TransferItem("upload", r"C:\local\big file.zip",
+                          "/remote/docs/big file.zip", size=2411724)
+        down = TransferItem("download", "/remote/docs/big file.zip",
+                            r"C:\local\big file.zip", size=2411724)
+        up_line = describe_item(up)
+        down_line = describe_item(down)
+        check("an upload reads as -> and names the local path first",
+              "UPLOAD ->" in up_line and "local: %s" % up.source in up_line
+              and "remote: %s" % up.target in up_line, up_line)
+        check("a download reads as <- and names the remote path first",
+              "DOWNLOAD <-" in down_line
+              and "remote: %s" % down.source in down_line
+              and "local: %s" % down.target in down_line, down_line)
+        check("the size and the file name are in the line",
+              "2.3 MB" in up_line and "big file.zip" in up_line, up_line)
+        folder = TransferItem("download", "/remote/docs", r"C:\out\docs",
+                              is_dir=True)
+        check("a folder is labelled as one", "folder" in describe_item(folder))
+        check("the line is single line, so the log stays greppable",
+              "\n" not in up_line and "\n" not in down_line)
+
+        done_item = TransferItem("download", "/r/a.bin", "C:/a.bin", size=2048)
+        done_item.status = "done"
+        done_item.transferred = 2048
+        result = describe_result(done_item, 1.0)
+        check("a finished transfer reports size, rate and time",
+              "2.0 KB" in result and "/s" in result and "1.0 s" in result,
+              result)
+        done_item.status = "error"
+        check("a failed transfer says so", describe_result(done_item, 1.0) == "failed")
+        done_item.status = "cancel"
+        check("a cancelled transfer says so",
+              describe_result(done_item, 1.0) == "cancelled")
+
+        queue_source = inspect.getsource(_transfer.TransferManager)
+        worker_source = inspect.getsource(_transfer.TransferWorker)
+        check("enqueue records every item it accepts",
+              '"Queued %s %s %s' in queue_source, "no line in enqueue")
+        check("a started transfer is recorded",
+              '"Started: %s"' in worker_source, "no Started line")
+        check("a settled transfer is recorded",
+              '"Finished"' in queue_source and '"Failed"' in queue_source,
+              "no outcome line")
+        check("a retry is recorded", '"Retrying (%d/%d)' in queue_source,
+              "no retry line")
+
+        if _qt_available() and _make_qapp():
+            from ftpclient import config as _config2
+
+            settings2 = _config2.Settings()
+            manager3 = _transfer.TransferManager(ftp, settings2)
+            manager3._stopped = True                # do not start transferring
+            seen = []
+            manager3.log.connect(lambda level, message: seen.append(
+                (level, message)))
+            probe = [TransferItem("download", "/r/one.bin", "C:/one.bin",
+                                  size=100),
+                     TransferItem("upload", "C:/two.bin", "/r/two.bin",
+                                  size=200)]
+            manager3.enqueue(probe)
+            queued = [message for _level, message in seen
+                      if message.startswith("Queued")]
+            check("the queue emits one log line per item", len(queued) == 2,
+                  str(len(queued)))
+            check("those lines carry the direction",
+                  any("download <-" in line for line in queued)
+                  and any("upload ->" in line for line in queued),
+                  str(queued))
+            manager3.shutdown()
+
         print("\n-- the two session classes stay separate --")
         # A patch once added an FTP-only helper call to SFTPSession.listdir(),
         # which broke every SFTP connection with an AttributeError the UI
