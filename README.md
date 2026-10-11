@@ -1,6 +1,6 @@
 # 青鸟 BlueBird — 现代奶白色 FTP / FTPS / SFTP 客户端
 
-**作者：silence** ｜ 版本 1.30.0
+**作者：silence** ｜ 版本 1.31.0
 
 基于 **Python 3.8.3 + PyQt5 5.15.11 + PyQtWebEngine 5.15.7 + paramiko** 实现的
 FTP/SFTP 双栏客户端，界面参考 **FileZilla Client** 的信息架构，但换成现代奶白色
@@ -292,70 +292,6 @@ D:\DSH_Workspaces\Ftp\python.exe -m PyInstaller --clean --noconfirm ^
 QtWebEngine 可用、主窗口构建成功、**手册页面真实渲染完成**；GUI 启动常驻
 （约 102 MB 内存）。
 
-### 与 Nuitka 的对比（实验性，**当前不可交付**）
-
-除 PyInstaller 外，仓库里还有一份 Nuitka 打包链路：
-
-```bat
-build_exe_nuitka.cmd              :: → dist-nuitka\
-build_exe_nuitka.cmd --jobs 4     :: 控制并行 C 编译器数量
-build_exe_nuitka.cmd --dry-run    :: 只打印命令行
-```
-
-| 工具 | 文件 | 说明 |
-|---|---|---|
-| `tools/build_nuitka.py` | 构建驱动 | **从 `packaging/BlueBird.spec` 读取排除清单**，两个构建不会各自漂移 |
-| `tools/patch_nuitka.py` | 源码补丁 | 幂等；`--check` 只看不改，`--revert` 还原 |
-
-**实测结果（同一份源码）**
-
-| 指标 | PyInstaller | Nuitka |
-|---|---|---|
-| 构建耗时 | 约 40 s | 约 73 s（8 并行 cl.exe） |
-| 主 exe | 1.6 MB | **10.4 MB** |
-| 整包体积 | **254.3 MB** | 229.8 MB |
-| 文件数 | 1468 | **362** |
-| 启动 | 正常 | 正常（`--version` 通过） |
-| **QtWebEngine** | ✅ 可用 | ❌ **子进程崩溃** |
-| `--selftest` | ✅ `SELFTEST OK` | ❌ 崩溃 |
-
-> **结论：Nuitka 版当前不能交付。** 编译产物能启动、`--version` 正常，但
-> QtWebEngine 子进程在启动时失败：
-> `ERROR:icu_util.cc(251)] Couldn't mmap icu data file`，进程以
-> `0x80000003` 退出。**程序内「用户手册」依赖 QtWebEngine**，所以这条路径
-> 直接不可用。
-
-**已知的两个障碍**
-
-1. **MSVC 拒绝 Nuitka 4.3 的一行源码**（已由 `patch_nuitka.py` 处理）。
-   `MetaPathBasedLoaderResourceReader.c` 里有个 `static char const *x[];`
-   的暂定定义，MSVC 报 `error C2133: unknown size`——它在 C11 模式下也照样
-   报错，**GCC 则接受**，所以 MinGW 路径不需要补丁。补丁把该行删掉（真正的
-   定义来自随后 include 的文件，且数组在此之前未被使用）。**这是 Nuitka 的
-   缺陷，不是本项目的**。
-
-2. **QtWebEngine 找不到 ICU 数据**（未解决）。Nuitka 把 Qt 目录压平了：
-   PyInstaller 保留 `PyQt5\Qt5\bin\`，Nuitka 把 DLL 与
-   `QtWebEngineProcess.exe` 都放在根目录。已排除的可能：
-   - 六个候选位置都放了 `icudtl.dat`（含 `resources\`、`bin\resources\`、
-     `PyQt5\Qt5\resources\`）——仍然失败；
-   - `icudtl.dat` 与源文件 **SHA256 完全一致**（10,505,952 字节），文件没坏；
-   - `QTWEBENGINE_RESOURCES_PATH`、`QTWEBENGINE_CHROMIUM_FLAGS=--no-sandbox`
-     （以及 `--disable-gpu`、`--in-process-gpu`）均无效；
-   - 文件属性、工作目录、`qt.conf` 差异都已排除。
-
-   Qt 5.15 取的是 `QLibraryInfo::DataPath + "/resources"`，而它由 `qt.conf`
-   的 `Prefix` 决定（Nuitka 生成 `Prefix = .`）。PyInstaller 的 `qt.conf`
-   在 `PyQt5\Qt5\bin\` 下写 `Prefix = ..`。**具体成因尚未确定。**
-
-**上游说明**：Nuitka 官方文档明确写 PyQt5「支持相对有问题」，存在
-**回调与线程的已知缺陷**（[nuitka.net/pages/pyqt5.html](https://nuitka.net/pages/pyqt5.html)），
-并建议迁移到 PySide6。QtWebEngine 正是线程/回调密集型组件，这与上面的现象一致。
-
-**因此：正式交付仍用 PyInstaller（`build_exe.cmd`）。** Nuitka 这条链路保留
-下来用于继续排查，脚本本身是完整可用的——`--dry-run`、幂等补丁、排除清单同步
-都已验证。
-
 ### 两本手册：用户手册 与 开发手册
 
 | 手册 | 读者 | 内容 | 是否随 exe 打包 |
@@ -543,7 +479,6 @@ Ftp Client/
 ├─ run.py                     启动入口（源码运行）
 ├─ run.cmd / run_tests.cmd    免配置启动 / 测试
 ├─ build_exe.cmd              重建手册 → PyInstaller 打包 → 自检
-├─ build_exe_nuitka.cmd       同上，改用 Nuitka（实验性，见上文对比）
 ├─ requirements.txt           依赖清单（含每个库的授权协议）
 ├─ LICENSE                    GPL-3.0 全文（随 exe 分发）
 ├─ THIRD-PARTY-NOTICES.txt    各依赖协议全文（随 exe 分发）
@@ -569,7 +504,7 @@ Ftp Client/
 │  └─ config.py               设置（settings.json）与连接（config.ini）
 ├─ tests/
 │  ├─ ftpserver.py            内嵌 pyftpdlib FTP 服务器
-│  ├─ test_ftp_roundtrip.py   会话层端到端测试（69 项）
+│  ├─ test_ftp_roundtrip.py   会话层端到端测试（128 项）
 │  ├─ test_ui_smoke.py        界面无头冒烟测试（320 项）
 ├─ tools/
 │  ├─ screenshot.py           生成文档截图
@@ -624,13 +559,13 @@ run_tests.cmd
 或者单独跑：
 
 ```bat
-D:\DSH_Workspaces\Ftp\python.exe tests\test_ftp_roundtrip.py   :: 69 项
+D:\DSH_Workspaces\Ftp\python.exe tests\test_ftp_roundtrip.py   :: 128 项
 D:\DSH_Workspaces\Ftp\python.exe tests\test_ui_smoke.py        :: 320 项（无头）
 ```
 
 覆盖范围：
 
-* **会话层 69 项**：连接、banner、MLSD 列目录、目录/文件识别、大小、导航、
+* **会话层 128 项**：连接、banner、MLSD 列目录、目录/文件识别、大小、导航、
   单文件上传下载、内容一致性、2 MiB 大文件往返、进度回调、递归上传计划、
   递归下载、文本读写、mkdir/rename/delete、递归删除、错误处理
   （路径不存在、端口拒绝且报错信息可读）、**7 条 FTP 错误路径必须抛
@@ -640,7 +575,7 @@ D:\DSH_Workspaces\Ftp\python.exe tests\test_ui_smoke.py        :: 320 项（无�
   * **内置手册与帮助菜单**：资源定位（源码/打包两种模式）、手册 HTML/PDF/MD 均能找到、
     HTML 自包含且已记录新功能、Help 菜单四项齐全、F1 打开手册、Shift+F1 快捷键、
     词条齐备、无 web 引擎时有浏览器回退；
-  * **中英文切换**：默认语言、348 条词条、英文直通、未知键回退、无效语言回退、
+  * **中英文切换**：默认语言、394 条词条、英文直通、未知键回退、无效语言回退、
     切换后菜单/面板/列标题/按钮/选项卡/状态栏/队列表头全部跟着变、
     协议下拉框的 data 不丢、语言偏好落盘、关键字符串无漏翻；
   * **桌面定位**：`local_desktop()` 解析到真实桌面目录（支持注册表重定向），
@@ -670,16 +605,21 @@ D:\DSH_Workspaces\Ftp\python.exe tests\test_ui_smoke.py        :: 320 项（无�
 ---
 
 ## 7. 已知边界
-* **SFTP 需要真实 SSH 服务器**：本机没有可用的 sshd，所以 SFTP 走的是与 FTP
-  同一套 `BaseSession` 接口（`listdir / chdir / mkdir / rename / delete /
-  delete_recursive / chmod / download_file / upload_file / read_text /
-  write_text`），代码完整但未在真实服务器上跑过端到端测试；密码登录、密钥
-  登录（可选择私钥文件）、keepalive、严格主机密钥校验都已接好。
-* **FTP 强制串行**：同一 FTP 控制连接不能并行传多个文件 —— 实测四个并发下载中
-  有三个被截断到 64 KB 且**不报错**，因此队列把 FTP 限为一个一个传（并发设置只对
-  SFTP 生效）。SFTP 每个文件独占一条 SSH 通道，并行安全（已实测 4 路 3 MB 全部完整）。
-* **传输模式**：默认**二进制**（逐字节）。只有扩展名在 ASCII 白名单里的文件才以
-  文本传输，此时会转换换行符（上传 CRLF→LF，下载 LF→CRLF）。ASCII 的白名单为空
-  则全部按二进制传输。
-* **FTPS** 使用显式 TLS（`AUTH TLS` + `PROT P`），数据通道同样加密。
-* 编辑大文件时编辑器会一次性载入内存（超过 4 MB 会先提示确认）。
+
+与用户手册第 13 章「已知限制」保持一致：
+
+1. **SFTP 已在真实服务器上验证**：OpenSSH 9.9（Ubuntu，`silence@192.168.31.142:22`）
+   密码登录、目录列表、权限列均实测通过。私钥登录、keepalive、严格主机密钥校验
+   这几条路径仍建议在自己的服务器上确认一次。
+2. **FTP 强制串行传输**：同一条 FTP 控制连接不能并行传多个文件 —— 实测四个并发
+   下载中有三个被截断到 64 KB 且**不报错**，因此队列把 FTP 限为一个一个地传
+   （并发设置只对 SFTP 生效）。SFTP 每个文件独占一条 SSH 通道，并行安全
+   （已实测 4 路 3 MB 全部完整）。
+3. **密码明文存储**在 `config.ini` 中，权限设置请自行注意。
+4. **编辑器一次性载入整个文件**，超过 4 MB 会先提示确认，不适合编辑超大文件。
+5. **Owner 列默认隐藏**（省约 92 px）；**Permissions 列默认显示**，
+   两列都可以在 **View** 菜单里随时开关。
+6. **权限列的显示形式取决于服务器**：给出 `unix.mode` 时显示 `-rw-r--r--`
+   这样的权限位；只给 MLSD `perm` 时显示该账号被允许的操作字母（如 `-rawfdMT`）。
+   两者含义不同，客户端不会把后者硬套成 Unix 格式。
+7. **严格的 SSH 主机密钥校验默认关闭**，首次连接前请确认服务器身份。

@@ -788,69 +788,52 @@ def main():
             manager3.shutdown()
 
         print("\n-- the frozen-environment detection --")
-        # resources.py has to tell three situations apart: plain source, a
-        # PyInstaller bundle (_MEIPASS) and a Nuitka standalone build (which
-        # sets neither sys.frozen nor _MEIPASS, and points sys.executable at a
-        # bundled python.exe).  All three are simulated here, because the two
-        # packaged branches cannot be produced inside this process.
+        # resources.py has to tell two situations apart: plain source, and a
+        # PyInstaller bundle where sys.frozen is set and the data lives in
+        # _MEIPASS.  Both are simulated here, because the packaged branch
+        # cannot be produced inside this process.
         from ftpclient import resources as _res
 
         had_frozen = hasattr(sys, "frozen")
         real_frozen = getattr(sys, "frozen", None)
         had_meipass = hasattr(sys, "_MEIPASS")
         real_meipass = getattr(sys, "_MEIPASS", None)
-        real_argv = list(sys.argv)
         real_exe = sys.executable
-        had_compiled = "__compiled__" in _res.__dict__
-        real_compiled = _res.__dict__.get("__compiled__")
 
         try:
             # 1. plain source
             sys.__dict__.pop("frozen", None)
             sys.__dict__.pop("_MEIPASS", None)
-            _res.__dict__.pop("__compiled__", None)
             check("source: not frozen", _res.is_frozen() is False)
-            check("source: not pyinstaller", _res.is_pyinstaller() is False)
             check("source: root is the project",
                   os.path.isdir(os.path.join(_res.resource_root(), "ftpclient")))
+            check("source: the manual is resolved from the project",
+                  _res.find_resource("docs") is not None)
 
-            # 2. PyInstaller: sys.frozen plus _MEIPASS
+            # 2. PyInstaller: sys.frozen set, data unpacked into _MEIPASS
             sys.frozen = True
             sys._MEIPASS = os.path.join(workdir, "meipass")
             os.makedirs(sys._MEIPASS, exist_ok=True)
             check("pyinstaller: frozen", _res.is_frozen() is True)
-            check("pyinstaller: detected as pyinstaller",
-                  _res.is_pyinstaller() is True)
-            check("pyinstaller: not mistaken for nuitka",
-                  _res.is_nuitka() is False)
             check("pyinstaller: bundle root is _MEIPASS",
                   _res.bundle_root() == sys._MEIPASS)
-
-            # 3. Nuitka: __compiled__ only, and an executable that is NOT the
-            #    program: Nuitka leaves a bundled python.exe beside it
-            del sys.frozen
-            del sys._MEIPASS
-            _res.__dict__["__compiled__"] = object()
-            program_dir = os.path.join(workdir, "nuitka-dist")
-            os.makedirs(program_dir, exist_ok=True)
-            program = os.path.join(program_dir, "BlueBird.exe")
-            with open(program, "wb") as handle:
-                handle.write(b"MZ")
-            sys.argv = [program, "--selftest"]
-            sys.executable = os.path.join(program_dir, "python.exe")
-            check("nuitka: frozen", _res.is_frozen() is True)
-            check("nuitka: detected as nuitka", _res.is_nuitka() is True)
-            check("nuitka: not mistaken for pyinstaller",
-                  _res.is_pyinstaller() is False)
-            check("nuitka: the program directory comes from argv[0]",
-                  _res.executable_dir() == os.path.abspath(program_dir),
+            check("pyinstaller: resource root follows the bundle",
+                  _res.resource_root() == sys._MEIPASS)
+            # the executable directory is still where the exe sits, which is
+            # what logfile.py uses to place logs/ beside the program
+            check("pyinstaller: the program directory is the exe's folder",
+                  _res.executable_dir() == os.path.dirname(
+                      os.path.abspath(sys.executable)),
                   _res.executable_dir())
-            check("nuitka: bundle root is the program directory",
-                  _res.bundle_root() == os.path.abspath(program_dir))
-            check("nuitka: resource root is the program directory",
-                  _res.resource_root() == os.path.abspath(program_dir))
+
+            # 3. one-folder builds leave _MEIPASS unset, and then the bundle
+            #    root has to fall back to the executable's own directory
+            del sys._MEIPASS
+            check("one-folder: bundle root falls back to the exe's folder",
+                  _res.bundle_root() == os.path.dirname(
+                      os.path.abspath(sys.executable)),
+                  _res.bundle_root())
         finally:
-            sys.argv = real_argv
             sys.executable = real_exe
             if had_frozen:
                 sys.frozen = real_frozen
@@ -860,12 +843,7 @@ def main():
                 sys._MEIPASS = real_meipass
             else:
                 sys.__dict__.pop("_MEIPASS", None)
-            if had_compiled:
-                _res.__dict__["__compiled__"] = real_compiled
-            else:
-                _res.__dict__.pop("__compiled__", None)
-            check("the environment was restored",
-                  _res.is_frozen() is False and _res.is_nuitka() is False)
+            check("the environment was restored", _res.is_frozen() is False)
 
         print("\n-- the two session classes stay separate --")
         # A patch once added an FTP-only helper call to SFTPSession.listdir(),

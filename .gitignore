@@ -6,14 +6,6 @@ __pycache__/
 build/
 dist/
 logs/
-# Nuitka output and its intermediate build folders
-dist-nuitka/
-*.build/
-*.dist/
-*.onefile-build/
-nuitka_probe*/
-_probe_*.py
-_probe_data/
 *.spec.bak
 bluebird-startup.log
 .smoke/
@@ -44,3 +36,4 @@ msgdoc.txt
 msgfinal.txt
 msgt.txt
 ui.txt
+msgnk2.txt

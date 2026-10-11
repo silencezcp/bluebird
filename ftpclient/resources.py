@@ -1,12 +1,10 @@
 """Where do bundled files live at runtime?
 
-Three situations have to be told apart:
+Two situations have to be told apart:
 
 * running from source - the resources sit next to the package;
-* a PyInstaller one-file build - they are unpacked into ``sys._MEIPASS``;
-* a Nuitka standalone build - no such variable exists, and ``sys.executable``
-  points at the *bundled copy of python.exe* rather than the program, so the
-  directory has to come from ``sys.argv[0]``.
+* inside a PyInstaller build - ``sys.frozen`` is set, and the data has been
+  unpacked into ``sys._MEIPASS`` for a one-file build.
 
 This module is the single place that knows the difference.
 """
@@ -17,52 +15,24 @@ import os
 import sys
 from typing import List, Optional
 
-#: Nuitka injects this into every compiled module; PyInstaller sets sys.frozen
-COMPILED = "__compiled__"
-
-
-def is_nuitka() -> bool:
-    """True inside a Nuitka-compiled module."""
-    return COMPILED in globals()
-
-
-def is_pyinstaller() -> bool:
-    """True inside a PyInstaller executable."""
-    return bool(getattr(sys, "frozen", False)) and not is_nuitka()
-
 
 def is_frozen() -> bool:
-    """True when running from a packaged executable, by either builder."""
-    return is_nuitka() or bool(getattr(sys, "frozen", False))
+    """True when running from a packaged executable."""
+    return bool(getattr(sys, "frozen", False))
 
 
 def executable_dir() -> str:
-    """The folder holding the program the user launched.
-
-    ``sys.executable`` is only right under PyInstaller.  A Nuitka standalone
-    build ships a copy of ``python.exe`` beside the program and points
-    ``sys.executable`` at it, which happens to be the same directory - but it is
-    spelled with short 8.3 path components there, so ``sys.argv[0]`` is used
-    first for a clean, fully resolved path.
-    """
-    if is_nuitka():
-        candidate = ""
-        if sys.argv and sys.argv[0]:
-            candidate = sys.argv[0]
-        if candidate.endswith(".py") or not candidate:
-            candidate = sys.executable
-        return os.path.dirname(os.path.abspath(candidate))
+    """The folder holding the program the user launched."""
     return os.path.dirname(os.path.abspath(sys.executable))
 
 
 def bundle_root() -> str:
     """Where the bundled *data* was placed at build time.
 
-    PyInstaller unpacks into ``_MEIPASS``.  Nuitka copies the data next to the
-    program, so this is the same as :func:`executable_dir` there.
+    PyInstaller unpacks a one-file build into ``_MEIPASS``; the one-folder
+    build used here puts the data beside the executable, which is what the
+    fallback covers.
     """
-    if is_nuitka():
-        return executable_dir()
     return getattr(sys, "_MEIPASS", executable_dir())
 
 
@@ -103,7 +73,7 @@ MANUAL_MD = ("docs", "\u7528\u6237\u624b\u518c.md")
 MANUAL_PDF = ("docs", "\u7528\u6237\u624b\u518c.pdf")
 
 __all__ = [
-    "is_frozen", "is_nuitka", "is_pyinstaller", "executable_dir",
-    "bundle_root", "resource_root", "resource_path", "find_resource",
+    "is_frozen", "executable_dir", "bundle_root", "resource_root",
+    "resource_path", "find_resource",
     "MANUAL_HTML", "MANUAL_MD", "MANUAL_PDF",
 ]
