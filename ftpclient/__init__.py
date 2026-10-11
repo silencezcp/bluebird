@@ -16,7 +16,7 @@ The package is deliberately split so the networking layer never imports Qt:
     ftpclient.app      - GUI entry point
 """
 
-__version__ = "1.0.0"
+__version__ = "1.29.0"
 __appname__ = "BlueBird"
 #: The Chinese name, shown alongside the English one in the interface.  It is
 #: not translated: 青鸟 is the product name, not a description.

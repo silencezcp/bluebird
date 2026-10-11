@@ -1,6 +1,6 @@
 # 青鸟 BlueBird — 现代奶白色 FTP / FTPS / SFTP 客户端
 
-**作者：silence** ｜ 版本 1.0.0
+**作者：silence** ｜ 版本 1.29.0
 
 基于 **Python 3.8.3 + PyQt5 5.15.11 + PyQtWebEngine 5.15.7 + paramiko** 实现的
 FTP/SFTP 双栏客户端，界面参考 **FileZilla Client** 的信息架构，但换成现代奶白色
