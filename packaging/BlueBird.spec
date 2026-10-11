@@ -53,6 +53,18 @@ shots = os.path.join(DOCS, "screenshots")
 if os.path.isdir(shots):
     datas.append((shots, "docs/screenshots"))
 
+# The licence files have to travel with the binaries: PyQt5 is GPL-3.0 and the
+# Qt libraries are LGPL, and both require their terms to accompany the program.
+# They sit in the folder that is handed out, so a recipient can always find
+# them.
+for name in ("LICENSE", "THIRD-PARTY-NOTICES.txt"):
+    path = os.path.join(ROOT, name)
+    if os.path.isfile(path):
+        datas.append((path, "."))
+    else:
+        print("BlueBird build: WARNING %s is missing - the distribution would "
+              "not carry its licence terms" % name)
+
 # ---------------------------------------------------------------------------
 # modules the static analysis cannot always see
 # ---------------------------------------------------------------------------

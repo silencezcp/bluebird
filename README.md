@@ -87,6 +87,31 @@ run.cmd ftp://user@192.168.1.10
 本次 25 项全部通过（`all 25 entries agree with the installed metadata`）。
 若某个库改了协议，运行该工具会立刻报出来。
 
+#### 本项目的授权与协议文件
+
+| 文件 | 内容 |
+|---|---|
+| `LICENSE` | **GPL-3.0**：项目声明 + **GPL 全文**（33 KB），随 exe 分发 |
+| `THIRD-PARTY-NOTICES.txt` | 各依赖的**协议全文**（112 KB），随 exe 分发 |
+
+**为什么本项目必须是 GPL-3.0**：`PyQt5` / `PyQtWebEngine` 是 GPL-3.0 或商业授权
+二选一，以 GPL 分发即合规。**若要闭源分发，必须购买 Riverbank 商业授权。**
+
+> GPL 全文取自本机已安装的 **Qt 运行时 wheel**
+> （`PyQt5_Qt5-5.15.2.dist-info/LICENSE`），是权威原文而非手打。第三方协议全文
+> 同样**从各 wheel 自带的文件复制**，不凭记忆重写；其中 Qt 那份文件里与
+> `LICENSE` 重复的 GPL-3.0 段落已改为指向 `LICENSE`（否则白占 32 KB）。
+
+两个文件都已写进 `packaging/BlueBird.spec`，会出现在 `dist\BlueBird\` 里 ——
+MIT / BSD / Apache-2.0 / LGPL 都要求**协议全文随二进制分发**。
+
+重新生成：
+
+```bat
+D:\DSH_Workspaces\Ftp\python.exe tools\make_notices.py          :: 第三方协议全文
+D:\DSH_Workspaces\Ftp\python.exe tools\make_notices.py --report  :: 只看找到哪些
+```
+
 三个关键传递依赖不能省：
 
 * **`PyNaCl`** —— paramiko 的 `ed25519key.py` 里是**裸 `import nacl.signing`**，
@@ -115,7 +140,7 @@ D:\DSH_Workspaces\Ftp\python.exe -m pip install -r requirements.txt ^
     --index-url https://mirrors.aliyun.com/pypi/simple/
 ```
 
-> **验证方式**：本清单已在**全新 venv** 中实测——22 个包版本与固定值完全一致，
+> **验证方式**：本清单已在**全新 venv** 中实测——25 个包版本与固定值完全一致，
 > 应用自检通过（Qt / web engine / PyNaCl / Ed25519 签名 / 手册渲染），
 > 两套测试 **69 + 320 全部通过**。这证明清单既**充分**（不缺包）又**最小**
 > （无多余包）。
@@ -448,7 +473,9 @@ Ftp Client/
 ├─ run.py                     启动入口（源码运行）
 ├─ run.cmd / run_tests.cmd    免配置启动 / 测试
 ├─ build_exe.cmd              重建手册 → PyInstaller 打包 → 自检
-├─ requirements.txt
+├─ requirements.txt           依赖清单（含每个库的授权协议）
+├─ LICENSE                    GPL-3.0 全文（随 exe 分发）
+├─ THIRD-PARTY-NOTICES.txt    各依赖协议全文（随 exe 分发）
 ├─ packaging/
 │  └─ BlueBird.spec           PyInstaller 配置（on-dir、剔除无用 Qt 模块）
 ├─ ftpclient/
@@ -470,11 +497,13 @@ Ftp Client/
 │  └─ config.py               设置（settings.json）与连接（config.ini）
 ├─ tests/
 │  ├─ ftpserver.py            内嵌 pyftpdlib FTP 服务器
-│  ├─ test_ftp_roundtrip.py   会话层端到端测试（48 项）
-│  ├─ test_ui_smoke.py        界面无头冒烟测试（317 项）
+│  ├─ test_ftp_roundtrip.py   会话层端到端测试（69 项）
+│  ├─ test_ui_smoke.py        界面无头冒烟测试（320 项）
 ├─ tools/
 │  ├─ screenshot.py           生成文档截图
 │  ├─ build_manual.py         由 Markdown 生成两本手册的 HTML / PDF
+│  ├─ deps_report.py          导出/审计依赖清单与授权协议
+│  ├─ make_notices.py         生成 THIRD-PARTY-NOTICES.txt
 │  └─ check_manual.py         检查手册的体积与目录跳转
 ├─ docs/
 │  ├─ 用户手册.md             用户手册源文件（随 exe 打包）
@@ -523,19 +552,19 @@ run_tests.cmd
 或者单独跑：
 
 ```bat
-D:\DSH_Workspaces\Ftp\python.exe tests\test_ftp_roundtrip.py   :: 48 项
-D:\DSH_Workspaces\Ftp\python.exe tests\test_ui_smoke.py        :: 317 项（无头）
+D:\DSH_Workspaces\Ftp\python.exe tests\test_ftp_roundtrip.py   :: 69 项
+D:\DSH_Workspaces\Ftp\python.exe tests\test_ui_smoke.py        :: 320 项（无头）
 ```
 
 覆盖范围：
 
-* **会话层 48 项**：连接、banner、MLSD 列目录、目录/文件识别、大小、导航、
+* **会话层 69 项**：连接、banner、MLSD 列目录、目录/文件识别、大小、导航、
   单文件上传下载、内容一致性、2 MiB 大文件往返、进度回调、递归上传计划、
   递归下载、文本读写、mkdir/rename/delete、递归删除、错误处理
   （路径不存在、端口拒绝且报错信息可读）、**7 条 FTP 错误路径必须抛
   `SessionError` 而不是 `TypeError`**、**`SIZE`/`MDTM` 单文件大小查询**、
   取消传输后自动重连。
-* **界面层 317 项**：
+* **界面层 320 项**：
   * **内置手册与帮助菜单**：资源定位（源码/打包两种模式）、手册 HTML/PDF/MD 均能找到、
     HTML 自包含且已记录新功能、Help 菜单四项齐全、F1 打开手册、Shift+F1 快捷键、
     词条齐备、无 web 引擎时有浏览器回退；
