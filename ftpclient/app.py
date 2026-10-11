@@ -169,6 +169,14 @@ def run_selftest() -> int:
             report.append("%-11s : %s" % (key, value))
         if status["manual html"] == "MISSING":
             failures.append("the manual HTML is not in the bundle")
+        if not status["web engine"]:
+            # Not merely a note: without this the manual silently opens in an
+            # external browser instead, which looks like a design choice rather
+            # than a broken bundle.
+            from .manual import WEB_ENGINE_ERROR
+            failures.append(
+                "QtWebEngine did not import, so the manual cannot open in the "
+                "in-app browser: %s" % (WEB_ENGINE_ERROR or "unknown reason"))
     except Exception as exc:
         failures.append("manual: %s" % exc)
 

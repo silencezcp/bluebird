@@ -1,6 +1,6 @@
 # 青鸟 BlueBird — 现代奶白色 FTP / FTPS / SFTP 客户端
 
-**作者：silence** ｜ 版本 1.36.0
+**作者：silence** ｜ 版本 1.36.1
 
 基于 **Python 3.8.3 + PyQt5 5.15.11 + PyQtWebEngine 5.15.7 + paramiko** 实现的
 FTP/SFTP 双栏客户端，界面参考 **FileZilla Client** 的信息架构，但换成现代奶白色
@@ -256,7 +256,7 @@ D:\DSH_Workspaces\Ftp\python.exe -m pip install -r requirements.txt ^
 
 ## 2.5 打包成 exe
 
-`dist\BlueBird\` 是免安装版（**约 239 MB**，不需要装 Python），里面只有**一个程序**：
+`dist\BlueBird\` 是免安装版（**约 248 MB**，不需要装 Python），里面只有**一个程序**：
 
 | 文件 | 说明 |
 |---|---|
@@ -280,8 +280,8 @@ pack_release.cmd zip     :: 同时出 .zip
 
 | 格式 | 体积 | 说明 |
 |---|---|---|
-| `.7z`（LZMA2 ultra） | **约 69 MB** | 默认输出，比 zip 小 32% |
-| `.zip`（deflate max） | 约 101 MB | 加 `zip` 参数才生成；Windows 自带解压，无需装 7-Zip |
+| `.7z`（LZMA2 ultra） | **约 71 MB** | 默认输出，比 zip 小 32% |
+| `.zip`（deflate max） | 约 104 MB | 加 `zip` 参数才生成；Windows 自带解压，无需装 7-Zip |
 
 输出在 `dist\release\`。
 
@@ -295,7 +295,7 @@ D:\DSH_Workspaces\Ftp\python.exe -m PyInstaller --clean --noconfirm ^
 | 项目 | 说明 |
 |---|---|
 | 输出 | `dist\BlueBird\`（**on-dir 模式**，不是单文件） |
-| 为什么不用单文件 | 单文件每次启动都要把约 239 MB 解压到临时目录，很慢；on-dir 秒开 |
+| 为什么不用单文件 | 单文件每次启动都要把约 248 MB 解压到临时目录，很慢；on-dir 秒开 |
 | 手册位置 | `dist\BlueBird\docs\`（**和 exe 同级**，可直接替换成你自己的版本） |
 | 自检 | `BlueBird.exe --selftest` → 结果写进当天的 `logs\YYYYMMDD.log` |
 | 日志 | `dist\BlueBird\logs\20261011.log` —— 界面 Log 标签页的每一行都在里面，每天一个新文件 |

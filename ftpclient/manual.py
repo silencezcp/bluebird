@@ -27,12 +27,29 @@ ZOOM_MIN = 0.5
 ZOOM_MAX = 2.5
 
 
+#: Why the web engine is unavailable, when it is.  Kept so the reason can be
+#: shown instead of the bare fact: a silent ImportError here once turned a
+#: broken bundle into "the manual just opens in a browser instead", with nothing
+#: anywhere saying why.
+WEB_ENGINE_ERROR: Optional[str] = None
+
+
 def web_engine_available() -> bool:
+    """True when the bundled QtWebEngine can be imported and used.
+
+    The import is the whole test: QtWebEngine refuses to load once a
+    QApplication exists unless AA_ShareOpenGLContexts was set first (app.py
+    does that), and it also fails if any of its DLLs or QML modules are
+    missing, which is what a too-eager trim would cause.
+    """
+    global WEB_ENGINE_ERROR
     try:
         from PyQt5.QtWebEngineWidgets import QWebEngineView  # noqa: F401
-        return True
-    except ImportError:
+    except Exception as exc:                 # noqa: BLE001 - report, never raise
+        WEB_ENGINE_ERROR = "%s: %s" % (type(exc).__name__, exc)
         return False
+    WEB_ENGINE_ERROR = None
+    return True
 
 
 def manual_html() -> Optional[str]:

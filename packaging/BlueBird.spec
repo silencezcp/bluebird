@@ -112,41 +112,56 @@ a = Analysis(
 )
 
 # ---------------------------------------------------------------------------
-# Trim what the bundle does not need.  This runs on *files*, not Python
-# modules, which is the distinction that matters: adding "PyQt5.QtXmlPatterns"
-# to excludes stops the Python binding being collected, but the Windows DLL
+# Trim what the bundle does not need.  This runs on *files*, not Python modules,
+# which is the distinction that matters: adding "PyQt5.QtXmlPatterns" to
+# excludes only stops the Python binding being collected, while
 # PyQt5\Qt5\bin\Qt5XmlPatterns.dll still arrives with the PyQt5 distribution
-# and has to be removed here by path.
+# and has to be removed here, by path.
 #
-# What is kept, and why:
-#   Qt5WebEngineCore.dll (97 MB) - the built-in manual viewer, the largest
-#       single file, kept deliberately;
-#   Qt5Quick / Qt5Qml / qml\QtQuick / qml\QtWebEngine / qml\QtWebChannel -
-#       QtWebEngine needs these, so they cannot go while the viewer stays;
-#   Qt5Svg - the status icons are drawn with QSvgRenderer;
-#   imageformats for png/jpeg/gif/ico/bmp - needed to read icons and to
-#       preview files;
+# READ THIS BEFORE ADDING A DLL RULE.
+#
+# A filename that nothing in the Python source mentions is NOT an unused file.
+# Qt's plugins import each other and QtWebEngine loads further pieces at
+# runtime.  A first attempt at this list removed Qt5Positioning.dll because no
+# code says "Positioning" - which broke the in-app manual completely, since
+# Qt5WebEngineCore.dll imports it.  It showed up only as
+# "ImportError: DLL load failed while importing QtWebEngineWidgets", with the
+# manual quietly falling back to the system browser.
+#
+# tools/check_dll_deps.py walks the real PE import tables and reports which
+# candidates something else imports.  Every .dll below was checked with it and
+# has no importer in the bundle.  Run it before adding another.
+#
+# Kept on purpose:
+#   Qt5WebEngineCore.dll (97 MB) and the DLLs it imports - Qt5Positioning,
+#       Qt5Location, Qt5WebSockets - for the built-in manual viewer;
+#   Qt5Quick / Qt5Qml / qml\QtQuick / qml\QtWebEngine / qml\QtWebChannel,
+#       loaded by QtWebEngine;
+#   qml\QtPositioning and qml\QtLocation, whose plugins import those DLLs;
+#   qml\QtSql, because qmllocalstorageplugin.dll imports Qt5Sql.dll;
+#   d3dcompiler_47 (4 MB), loaded dynamically by WebEngine's ANGLE backend so
+#       the scanner cannot see it; it is small and dropping it risks a blank
+#       manual on a virtual machine or over remote desktop;
+#   Qt5Svg, because the status icons are drawn with QSvgRenderer;
+#   imageformats for png/jpeg/gif/ico/bmp - icons and file previews;
 #   opengl32sw - see KEEP_SOFTWARE_OPENGL below.
 # ---------------------------------------------------------------------------
 TRIM_PREFIXES = (
     # Qt's own translation catalogues; the app localises its own strings
     "PyQt5\\Qt5\\translations\\",
-    # QML modules nothing in this application loads
+    # QML modules nothing loads, and which no remaining plugin imports
     "PyQt5\\Qt5\\qml\\Qt3D",
     "PyQt5\\Qt5\\qml\\QtSensors",
-    "PyQt5\\Qt5\\qml\\QtLocation",
-    "PyQt5\\Qt5\\qml\\QtPositioning",
     "PyQt5\\Qt5\\qml\\QtCharts",
     "PyQt5\\Qt5\\qml\\QtDataVisualization",
     "PyQt5\\Qt5\\qml\\QtPurchasing",
-    "PyQt5\\Qt5\\qml\\QtQuick3D",          # 3.8 MB
-    "PyQt5\\Qt5\\qml\\QtTest",             # 0.16 MB, for QML tests
-    "PyQt5\\Qt5\\qml\\QtBluetooth",        # 0.10 MB
-    "PyQt5\\Qt5\\qml\\QtNfc",              # 0.06 MB
-    "PyQt5\\Qt5\\qml\\QtMultimedia",       # 0.36 MB
-    "PyQt5\\Qt5\\qml\\QtWebSockets",       # 0.05 MB
-    "PyQt5\\Qt5\\qml\\QtRemoteObjects",    # 0.05 MB
-    "PyQt5\\Qt5\\qml\\QtWebView",          # 0.04 MB
+    "PyQt5\\Qt5\\qml\\QtQuick3D",          # 3.8 MB, 275 files
+    "PyQt5\\Qt5\\qml\\QtTest",             # for QML tests
+    "PyQt5\\Qt5\\qml\\QtBluetooth",
+    "PyQt5\\Qt5\\qml\\QtNfc",
+    "PyQt5\\Qt5\\qml\\QtMultimedia",
+    "PyQt5\\Qt5\\qml\\QtRemoteObjects",
+    "PyQt5\\Qt5\\qml\\QtWebView",
     # plugins for features the client does not use
     "PyQt5\\Qt5\\plugins\\sqldrivers",     # no database
     "PyQt5\\Qt5\\plugins\\designer",       # not editing .ui files
@@ -156,40 +171,28 @@ TRIM_PREFIXES = (
     "PyQt5\\Qt5\\plugins\\mediaservice",
     "PyQt5\\Qt5\\plugins\\audio",
     "PyQt5\\Qt5\\plugins\\geoservices",
-    "PyQt5\\Qt5\\plugins\\position",
     "PyQt5\\Qt5\\plugins\\sensorgestures",
     "PyQt5\\Qt5\\plugins\\sensors",
     "PyQt5\\Qt5\\plugins\\webview",
-    # Windows DLLs that ship with PyQt5 but nothing here calls
-    "PyQt5\\Qt5\\bin\\Qt5XmlPatterns.dll",  # 2.5 MB, unused
-    "PyQt5\\Qt5\\bin\\Qt5Sql.dll",
-    "PyQt5\\Qt5\\bin\\Qt5Test.dll",
+    # DLLs with no importer in the bundle, confirmed with check_dll_deps.py
     "PyQt5\\Qt5\\bin\\Qt5Designer.dll",
     "PyQt5\\Qt5\\bin\\Qt5Bluetooth.dll",
     "PyQt5\\Qt5\\bin\\Qt5Nfc.dll",
-    "PyQt5\\Qt5\\bin\\Qt5Positioning.dll",
     "PyQt5\\Qt5\\bin\\Qt5Sensors.dll",
     "PyQt5\\Qt5\\bin\\Qt5SerialPort.dll",
     "PyQt5\\Qt5\\bin\\Qt5Multimedia.dll",
     "PyQt5\\Qt5\\bin\\Qt5MultimediaWidgets.dll",
-    "PyQt5\\Qt5\\bin\\Qt5WebSockets.dll",
-    "PyQt5\\Qt5\\bin\\Qt5Location.dll",
-    # d3dcompiler is only reached by WebEngine's ANGLE path, and the client
-    # renders through QtWidgets rather than WebGL
-    "PyQt5\\Qt5\\bin\\d3dcompiler_47.dll",  # 4.0 MB
     # image formats the client never reads
     "PyQt5\\Qt5\\plugins\\imageformats\\qwbmp.dll",
     "PyQt5\\Qt5\\plugins\\imageformats\\qtga.dll",
-    "PyQt5\\Qt5\\plugins\\imageformats\\qicns.dll",
 )
 
-#: The software OpenGL fallback (20 MB) is kept by default.  It is what makes
-#: the program start at all on a machine with no usable GPU driver - a virtual
-#: machine, or a remote desktop session - and that is exactly the machine a
-#: portable FTP client tends to be run on.  Set BLUEBIRD_DROP_OPENGL=1 to trade
-#: those 20 MB for a potential "failed to create OpenGL context" at startup.
-import os as _os
-if _os.environ.get("BLUEBIRD_DROP_OPENGL") == "1":
+#: The software OpenGL fallback (20 MB) is kept by default.  It is what lets the
+#: program start at all on a machine with no usable GPU driver - a virtual
+#: machine, or a remote desktop session - which is exactly where a portable FTP
+#: client tends to be run.  Set BLUEBIRD_DROP_OPENGL=1 to trade those 20 MB for
+#: a possible "failed to create OpenGL context" at startup.
+if os.environ.get("BLUEBIRD_DROP_OPENGL") == "1":
     TRIM_PREFIXES += ("PyQt5\\Qt5\\bin\\opengl32sw.dll",)
 
 #: (path fragment, description) for log lines such as "lib not found: ..."
@@ -235,7 +238,7 @@ _after = len(a.binaries) + len(a.datas)
 print("BlueBird build: trimmed %d of %d collected files"
       % (_before - _after, _before))
 
-if _os.environ.get("BLUEBIRD_TRIM_REPORT") != "0":
+if os.environ.get("BLUEBIRD_TRIM_REPORT") != "0":
     _removed = {}
     for entry in _collected:
         if _keep(entry):
