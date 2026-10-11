@@ -19,6 +19,7 @@ from PyQt5.QtWidgets import (QAbstractItemView, QCheckBox, QColorDialog,
 
 from . import config as _config
 from . import session as _session
+from . import transfer as _transfer
 from .i18n import LANGUAGE_NAMES, T, i18n, localise_box
 from .widgets import LogView, PathBar
 
@@ -1006,10 +1007,17 @@ class PreferencesDialog(_LocalisedButtons, QDialog):
         box = QGroupBox(T("Queue"), page)
         form = self._form()
         self.concurrency = QSpinBox(box)
-        self.concurrency.setRange(1, 4)
+        self.concurrency.setRange(1, _transfer.MAX_CONCURRENCY)
+        self.concurrency.setToolTip(T(
+            "How many files are transferred at the same time.\n"
+            "SFTP runs this many in parallel; FTP is always one at a time "
+            "because its transfers share a single control connection."))
         form.addRow(T("Simultaneous transfers"), self.concurrency)
         self.retries = QSpinBox(box)
-        self.retries.setRange(0, 10)
+        self.retries.setRange(0, 20)
+        self.retries.setToolTip(T(
+            "How many times a failed transfer is retried before it is "
+            "reported as failed."))
         form.addRow(T("Automatic retries"), self.retries)
         self.preserve_timestamps = QCheckBox(T("Keep the original modification time"),
                                              box)
@@ -1029,17 +1037,24 @@ class PreferencesDialog(_LocalisedButtons, QDialog):
 
         mode = QGroupBox(T("Transfer mode"), page)
         mode_layout = QVBoxLayout(mode)
-        hint = QLabel(T("Extensions always sent as text (ASCII) or always sent "
-                        "byte-for-byte (binary). Space separated."), mode)
+        hint = QLabel(T("Files are transferred byte-for-byte (binary) unless the "
+                        "extension is in the list below. Space separated."), mode)
         hint.setObjectName("Hint")
         hint.setWordWrap(True)
         mode_layout.addWidget(hint)
         self.ascii_ext = QLineEdit(mode)
-        mode_layout.addWidget(QLabel(T("ASCII extensions"), mode))
+        self.ascii_ext.setToolTip(T(
+            "Files with these extensions are sent as text (ASCII) instead of "
+            "byte-for-byte.\n\n"
+            "ASCII mode converts line endings: a download turns the server's "
+            "CRLF into LF, and an upload turns LF into CRLF. That is what a "
+            "Windows \\r\\n ↔ Linux \\n difference needs, but it corrupts "
+            "anything that is not plain text, so keep the list short.\n\n"
+            "An empty list means everything is transferred as binary."))
+        ascii_label = QLabel(T("ASCII extensions"), mode)
+        ascii_label.setToolTip(self.ascii_ext.toolTip())
+        mode_layout.addWidget(ascii_label)
         mode_layout.addWidget(self.ascii_ext)
-        self.binary_ext = QLineEdit(mode)
-        mode_layout.addWidget(QLabel(T("Binary extensions"), mode))
-        mode_layout.addWidget(self.binary_ext)
         layout.addWidget(mode)
         layout.addStretch(1)
         return page
@@ -1117,7 +1132,6 @@ class PreferencesDialog(_LocalisedButtons, QDialog):
         self.refresh_after_transfer.setChecked(
             bool(transfers.get("refresh_after_transfer", True)))
         self.ascii_ext.setText(str(transfers.get("ascii_extensions", "")))
-        self.binary_ext.setText(str(transfers.get("binary_extensions", "")))
 
         self.timeout.setValue(int(sessions.get("timeout", 30) or 30))
         self.keepalive.setValue(int(sessions.get("keepalive", 30) or 30))
@@ -1153,7 +1167,6 @@ class PreferencesDialog(_LocalisedButtons, QDialog):
             "notify_finished": self.notify_finished.isChecked(),
             "refresh_after_transfer": self.refresh_after_transfer.isChecked(),
             "ascii_extensions": self.ascii_ext.text().strip(),
-            "binary_extensions": self.binary_ext.text().strip(),
         }, autosave=False)
         self.settings.update("sessions", {
             "timeout": int(self.timeout.value()),

@@ -264,6 +264,13 @@ class MainWindow(QMainWindow):
         self._flush_scheduled = False
         #: "Yes to all" applies to the current batch only, then resets
         self._overwrite_all = False
+        #: the remote directory listing, fetched once per upload batch; asking
+        #: the server about each file separately cost 33 s for 600 files
+        self._upload_dir_names: Optional[set] = None
+        #: the same idea for downloads: the local directories already created
+        #: and the target paths already known to exist
+        self._download_dirs_made: set = set()
+        self._download_existing: Optional[set] = None
         #: the test suite runs windowless, so it can mute the status dialogs
         self._quiet_dialogs = bool(
             os.environ.get("BLUEBIRD_QUIET_DIALOGS", ""))
@@ -1153,10 +1160,12 @@ class MainWindow(QMainWindow):
         except Exception as exc:  # noqa: BLE001
             QMessageBox.warning(self, "Upload", human_error(exc))
             return
+        # a new batch: forget the previous batch's answers before asking
+        self._overwrite_all = False
+        self._upload_dir_names = None
         items = [i for i in items if self._confirm_overwrite_upload(i)]
         if not items:
             return
-        self._overwrite_all = False
         self.manager.enqueue(items)
         total = sum(int(i.size or 0) for i in items)
         self.log("info", "Queued %d item(s) for upload (%s)"
@@ -1187,10 +1196,13 @@ class MainWindow(QMainWindow):
         except Exception as exc:  # noqa: BLE001
             QMessageBox.warning(self, "Download", human_error(exc))
             return
+        # a new batch: forget the previous batch's answers before asking
+        self._overwrite_all = False
+        self._download_dirs_made = set()
+        self._download_existing = None
         items = [i for i in items if self._confirm_overwrite_download(i)]
         if not items:
             return
-        self._overwrite_all = False
         self.manager.enqueue(items)
         total = sum(int(i.size or 0) for i in items)
         self.log("info", "Queued %d item(s) for download (%s)"
@@ -1206,10 +1218,16 @@ class MainWindow(QMainWindow):
         if self._overwrite_all:
             return True
         remote = self._remote_join(item.display_name)
-        try:
-            exists = remote in [e.name for e in self.session.listdir()]
-        except Exception:
-            exists = False
+        # Listing the directory once per *file* made a 600 file upload spend 33
+        # seconds in 600 round trips before the first byte moved, which is what
+        # made a big batch look frozen.  One listing per batch answers every
+        # question in the batch.
+        if self._upload_dir_names is None:
+            try:
+                self._upload_dir_names = {e.name for e in self.session.listdir()}
+            except Exception:                      # noqa: BLE001
+                self._upload_dir_names = set()
+        exists = remote in self._upload_dir_names
         if not exists:
             return True
         answer = QMessageBox.question(
@@ -1229,14 +1247,23 @@ class MainWindow(QMainWindow):
 
     def _confirm_overwrite_download(self, item: TransferItem) -> bool:
         if item.is_dir:
+            # a batch of folders means thousands of stat() calls if every item
+            # is asked about separately, so each directory is made once
+            if item.target in self._download_dirs_made:
+                return True
             try:
                 _session.ensure_local_dir(item.target)
             except SessionError as exc:
                 self.log("error", str(exc))
                 return False
+            self._download_dirs_made.add(item.target)
             return True
-        if not os.path.exists(item.target):
-            return True
+        if self._download_existing is None:
+            self._download_existing = set()
+        if item.target not in self._download_existing:
+            if not os.path.exists(item.target):
+                return True
+            self._download_existing.add(item.target)
         if not self.settings.get("behavior", "confirm_overwrite", True):
             return True
         if self._overwrite_all:

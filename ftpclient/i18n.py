@@ -555,6 +555,14 @@ ZH: Dict[str, str] = {
     "Warning": "警告",
     "Error": "错误",
     "Question": "询问",
+    "Files are transferred byte-for-byte (binary) unless the extension is in the list below. Space separated.":
+        "文件默认按**二进制（逐字节）**传输；只有扩展名在下面列表里的才以文本（ASCII）方式传输。用空格分隔。",
+    "How many files are transferred at the same time.\nSFTP runs this many in parallel; FTP is always one at a time because its transfers share a single control connection.":
+        "同时传输多少个文件。\nSFTP 会按此并行传输；FTP 始终只能一个一个地传，因为它的传输共用一条控制连接。",
+    "How many times a failed transfer is retried before it is reported as failed.":
+        "传输失败后重试多少次，超过后才报告为失败。",
+    "Files with these extensions are sent as text (ASCII) instead of byte-for-byte.\n\nASCII mode converts line endings: a download turns the server's CRLF into LF, and an upload turns LF into CRLF. That is what a Windows \\r\\n ↔ Linux \\n difference needs, but it corrupts anything that is not plain text, so keep the list short.\n\nAn empty list means everything is transferred as binary.":
+        "这些扩展名的文件以**文本（ASCII）**方式传输，而不是逐字节。\n\nASCII 会**转换换行符**：下载时把服务器的 CRLF 转为 LF，上传时把 LF 转为 CRLF。这正是 Windows 的 `\\r\\n` 与 Linux 的 `\\n` 差异所需，但它会**破坏非纯文本文件**，所以列表宜短。\n\n空则全部按二进制传输。",
 }
 
 

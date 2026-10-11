@@ -244,18 +244,18 @@ DEFAULT_SETTINGS: Dict[str, Any] = {
         "log_lines": 2000,
     },
     "transfers": {
-        "concurrency": 2,
-        "retries": 2,
+        "concurrency": 5,
+        "retries": 5,
         "preserve_timestamps": False,
         #: pop up a result dialog when a transfer (batch) finishes
         "notify_finished": True,
         #: refresh the affected pane so the new files show up immediately
         "refresh_after_transfer": True,
+        #: Transfers are binary unless the file's extension is in this list.
+        #: Binary is the byte-exact default; ASCII re-encodes line endings,
+        #: which is only wanted for text on servers that insist on it.  An
+        #: empty list means everything is binary.
         "ascii_extensions": ".txt .html .htm .php .js .css .json .xml .md .csv",
-        "binary_extensions": ".zip .gz .tar .tgz .bz2 .7z .rar .exe .dll .so "
-                             ".png .jpg .jpeg .gif .bmp .webp .ico .pdf .doc "
-                             ".docx .xls .xlsx .ppt .pptx .mp3 .mp4 .avi .mkv "
-                             ".iso .bin .dat .pyc .jar .woff .woff2 .ttf",
     },
     "sessions": {
         "timeout": 30,

@@ -16,18 +16,54 @@ import os
 import shutil
 import sys
 import tempfile
+import threading
 import time
 import traceback
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from ftpclient import session as S            # noqa: E402
+from ftpclient import transfer as _transfer    # noqa: E402
 from ftpclient.models import TransferItem, format_size  # noqa: E402
 from ftpclient.transfer import plan_downloads, plan_uploads  # noqa: E402
 from tests.ftpserver import TestFTPServer, make_tree  # noqa: E402
 
+import inspect                                 # noqa: E402
+
 PASSED = []
 FAILED = []
+
+
+def _qt_available() -> bool:
+    """True when PyQt5 is importable, so the queue can be exercised."""
+    try:
+        import PyQt5.QtWidgets  # noqa: F401
+        return True
+    except ImportError:
+        return False
+
+
+def _make_qapp():
+    """A QApplication for the queue test, or False when it cannot be made.
+
+    The offscreen platform is used when no display is set so this works in the
+    same headless run as the rest of the suite.
+    """
+    if not os.environ.get("QT_QPA_PLATFORM"):
+        os.environ["QT_QPA_PLATFORM"] = "offscreen"
+    try:
+        from PyQt5.QtWidgets import QApplication
+        return QApplication.instance() or QApplication(["test"])
+    except Exception:
+        return False
+
+
+def _pump_events() -> None:
+    from PyQt5.QtCore import QEventLoop
+    from PyQt5.QtWidgets import QApplication
+    app = QApplication.instance()
+    if app is not None:
+        app.processEvents(QEventLoop.AllEvents, 50)
 
 
 def check(name, condition, detail=""):
@@ -368,12 +404,252 @@ def main():
         ended = ftp.listdir()
         check("usable after reconnect", any(e.name == "readme.txt" for e in ended))
 
+        print("\n-- FTP cannot run two transfers at once --")
+        # Two transfers started together race for the one data socket, and the
+        # loser is truncated to a single chunk with no error raised.  The check
+        # below is the wrong-file evidence, not a fix: it is kept so the reason
+        # the queue clamps FTP is visible in the suite and cannot be "cleaned
+        # up" by accident.
+        check("the FTP session asks for serial transfers",
+              getattr(S.FTPSession, "serial_transfers", False) is True)
+        check("the SFTP session does not",
+              getattr(S.SFTPSession, "serial_transfers", True) is False)
+
+        calls = {"active": 0, "peak": 0}
+        real = S.FTPSession.download_file
+
+        def counting(self, name, target, progress=None, control=None):
+            calls["active"] += 1
+            calls["peak"] = max(calls["peak"], calls["active"])
+            try:
+                return real(self, name, target, progress, control)
+            finally:
+                calls["active"] -= 1
+
+        big = "parallel-probe.bin"
+        payload = os.urandom(512 * 1024)
+        local_big = os.path.join(workdir, big)
+        with open(local_big, "wb") as handle:
+            for _ in range(4):
+                handle.write(payload)
+        ftp.upload_file(local_big, big)
+        expected = os.path.getsize(local_big)
+
+        def fetch(index, suffix=""):
+            target = os.path.join(workdir, "parallel-out%s%d" % (suffix, index))
+            try:
+                return True, ftp.download_file(big, target)
+            except Exception as exc:                  # noqa: BLE001
+                return False, "%s: %s" % (type(exc).__name__, exc)
+
+        def run_together(count):
+            results = {}
+
+            def work(index):
+                results[index] = fetch(index, "raw")
+
+            workers = [threading.Thread(target=work, args=(i,))
+                       for i in range(count)]
+            for worker in workers:
+                worker.start()
+            for worker in workers:
+                worker.join()
+            return results
+
+        S.FTPSession.download_file = counting
+        try:
+            raw = run_together(4)
+        finally:
+            S.FTPSession.download_file = real
+        sizes = sorted(value for ok, value in raw.values() if ok)
+        check("running four FTP transfers at once really does truncate",
+              sizes != [expected] * 4,
+              "all four were correct (%s), so the clamp is untested" % sizes)
+        print("        (reproduced: %s of %s bytes)"
+              % (sizes, expected))
+
+        # the queue must clamp, because the session itself does not
+        check("the queue reads the serial-transfers flag",
+              "serial_transfers" in inspect.getsource(
+                  _transfer.TransferManager._pump))
+
+        if _qt_available():
+            workdir_qt = _make_qapp()
+            if workdir_qt:
+                from ftpclient import config as _config
+                from ftpclient.models import TransferItem as _Item
+
+                settings = _config.Settings()
+                settings.set("transfers", "concurrency", 4)
+                manager = _transfer.TransferManager(ftp, settings)
+                queued = []
+                for index in range(3):
+                    item = _Item("download", big,
+                                 os.path.join(workdir, "queued%d" % index))
+                    item.size = expected
+                    queued.append(item)
+                calls["peak"] = 0
+                S.FTPSession.download_file = counting
+                try:
+                    manager.enqueue(queued)
+                    deadline = time.time() + 60
+                    while time.time() < deadline:
+                        _pump_events()
+                        if manager.pending() == 0:
+                            break
+                        time.sleep(0.02)
+                finally:
+                    S.FTPSession.download_file = real
+                check("the queued FTP downloads all finished",
+                      manager.pending() == 0, manager.summary())
+                check("the queue ran them one at a time, despite 4 being asked",
+                      calls["peak"] == 1, "peak was %d" % calls["peak"])
+                arrived = [index for index in range(3)
+                           if os.path.isfile(
+                               os.path.join(workdir, "queued%d" % index))
+                           and os.path.getsize(
+                               os.path.join(workdir, "queued%d" % index))
+                           == expected]
+                check("every queued download arrived whole",
+                      len(arrived) == 3, str(arrived))
+        else:
+            print("        (PyQt5 not installed: the queue clamp is only "
+                  "checked for the flag)")
+
+        print("\n-- ASCII mode only for whitelisted extensions --")
+        # Binary is the default because it is byte exact; ASCII re-encodes line
+        # endings, so it must not be used for a file that is not on the list.
+        from ftpclient.transfer import TransferManager as _TM
+        from ftpclient import config as _cfg
+
+        cfg_dir = os.path.join(workdir, "modecfg")
+        os.makedirs(cfg_dir)
+        os.environ["BLUEBIRD_SETTINGS"] = os.path.join(cfg_dir, "settings.json")
+        os.environ["BLUEBIRD_CONFIG"] = os.path.join(cfg_dir, "config.ini")
+        mode_settings = _cfg.Settings()
+        mode_settings.set("transfers", "ascii_extensions",
+                          ".txt .html .md")
+        mode_manager = _TM(ftp, mode_settings)
+
+        def item_named(name):
+            return TransferItem("download", name, os.path.join(workdir, name))
+
+        check("a .txt file is sent as ASCII",
+              mode_manager.mode_for(item_named("readme.txt")) == "ascii")
+        check("a .MD file matches case insensitively",
+              mode_manager.mode_for(item_named("NOTES.MD")) == "ascii")
+        check("a .zip file stays binary",
+              mode_manager.mode_for(item_named("archive.zip")) == "binary")
+        check("a file with no extension stays binary",
+              mode_manager.mode_for(item_named("Makefile")) == "binary")
+        check("a name merely containing .txt stays binary",
+              mode_manager.mode_for(item_named("notes.txt.bak")) == "binary")
+        check("a folder is binary",
+              mode_manager.mode_for(
+                  TransferItem("download", "dir", "dir", is_dir=True))
+              == "binary")
+
+        mode_settings.set("transfers", "ascii_extensions", "")
+        check("an empty whitelist means everything is binary",
+              mode_manager.mode_for(item_named("readme.txt")) == "binary")
+
+        mode_settings.set("transfers", "ascii_extensions", "txt, log")
+        check("extensions may be separated by commas and lack the dot",
+              mode_manager.mode_for(item_named("a.txt")) == "ascii"
+              and mode_manager.mode_for(item_named("b.log")) == "ascii")
+
+        mode_settings.set("transfers", "ascii_extensions", ".txt")
+        check("the retry default is five",
+              _cfg.Settings().get("transfers", "retries", None) == 5
+              or mode_settings.get("transfers", "retries", None) == 5)
+        check("the concurrency default is five",
+              mode_settings.get("transfers", "concurrency", None) == 5)
+
+        print("\n-- ASCII mode converts line endings --")
+        crlf = b"one\r\ntwo\r\nthree\r\n"
+        lf = b"one\ntwo\nthree\n"
+        text_path = os.path.join(workdir, "newlines.txt")
+        with open(text_path, "wb") as handle:
+            handle.write(crlf)
+
+        ftp2 = S.create_session({"protocol": "ftp", "host": host, "port": port,
+                                 "user": "tester", "password": "secret",
+                                 "timeout": 20})
+        ftp2.connect()
+        try:
+            # binary must be byte exact in both directions
+            ftp2._set_transfer_type("binary")
+            ftp2.upload_file(text_path, "nl-bin.txt")
+            with open(os.path.join(server_root, "nl-bin.txt"), "rb") as fh:
+                check("binary upload is byte exact", fh.read() == crlf)
+            back = os.path.join(workdir, "nl-bin-back.txt")
+            ftp2.download_file("nl-bin.txt", back)
+            with open(back, "rb") as fh:
+                check("binary download is byte exact", fh.read() == crlf)
+
+            # ASCII: the server convention is Unix, the local one is Windows
+            ftp2._set_transfer_type("ascii")
+            ftp2.upload_file(text_path, "nl-asc.txt")
+            with open(os.path.join(server_root, "nl-asc.txt"), "rb") as fh:
+                check("ascii upload sends LF to the server", fh.read() == lf)
+            # stage an LF file on the server, which is what a Unix server has
+            with open(os.path.join(server_root, "nl-lf.txt"), "wb") as fh:
+                fh.write(lf)
+            back2 = os.path.join(workdir, "nl-lf-back.txt")
+            ftp2.download_file("nl-lf.txt", back2)
+            with open(back2, "rb") as fh:
+                check("ascii download writes CRLF locally", fh.read() == crlf)
+        finally:
+            ftp2.disconnect()
+
+        print("\n-- a large batch is queued without asking per file --")
+        # Listing the directory once per file cost 33 seconds for 600 files
+        # before the first byte moved.  This reproduces that path directly.
+        listed = {"n": 0}
+        real_listdir = S.FTPSession.listdir
+
+        def counted_listdir(self, path=""):
+            listed["n"] += 1
+            return real_listdir(self, path)
+
+        class _StubWindow(object):
+            """The parts of MainWindow._confirm_overwrite_upload."""
+
+            def __init__(self, session):
+                self.session = session
+                self.settings = mode_settings
+                self._overwrite_all = False
+                self._upload_dir_names = None
+                self._remote_dir = "/"
+
+            def _remote_join(self, name):
+                return "/" + name
+
+            def _message(self, *_args, **_kwargs):
+                return 0
+
+        from ftpclient.main import MainWindow as _MW
+        stub = _StubWindow(ftp2 if False else ftp)
+        confirm = _MW._confirm_overwrite_upload.__get__(stub)
+        batch = [item_named("batch%04d.txt" % index) for index in range(300)]
+        for entry_index, item in enumerate(batch):
+            item.target = "/batch%04d.txt" % entry_index
+
+        S.FTPSession.listdir = counted_listdir
+        try:
+            answers = [confirm(item) for item in batch]
+        finally:
+            S.FTPSession.listdir = real_listdir
+        check("every file in the batch was answered", len(answers) == 300,
+              str(len(answers)))
+        check("the directory was listed once, not once per file",
+              listed["n"] == 1, "%d listings" % listed["n"])
+
         print("\n-- the two session classes stay separate --")
         # A patch once added an FTP-only helper call to SFTPSession.listdir(),
         # which broke every SFTP connection with an AttributeError the UI
         # swallowed.  These checks catch that class of mistake without needing
         # a real SSH server.
-        import inspect
         import re as _re
         ftp_only = ("_sync_control", "_drain_control", "_begin_transfer",
                     "_finish_command", "_remote_size", "_pasv_socket")

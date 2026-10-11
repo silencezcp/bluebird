@@ -1,10 +1,16 @@
 """Background transfer queue.
 
 A small pool of worker threads pulls :class:`~ftpclient.models.TransferItem`
-objects out of the queue and runs them against a session.  The session is
-guarded by its own re-entrant lock, so several workers may share one
-connection as long as the protocol tolerates it (SFTP does; FTP is serialised
-by the queue's concurrency setting).
+objects out of the queue and runs them against a session.  How many may run at
+once depends on the protocol, not just the preference:
+
+* SFTP runs several at a time, each on its own channel of the one SSH
+  connection;
+* FTP runs exactly one, because its data connections are negotiated over a
+  single control connection and concurrent transfers race for the data socket.
+  That was measured: three of four parallel downloads came back truncated to
+  64 KB with no error raised.  :attr:`~ftpclient.session.BaseSession
+  .serial_transfers` says which applies.
 
 No Qt widgets are touched from the worker threads: every result travels back
 to the GUI thread through signals.
@@ -25,6 +31,9 @@ from .core import Entry, TransferItem
 
 #: transfers slower than this tick are still reported at least twice a second
 REPORT_INTERVAL = 0.2
+
+#: the largest number of simultaneous transfers the preference accepts
+MAX_CONCURRENCY = 16
 
 
 class TransferWorker(QRunnable):
@@ -103,14 +112,19 @@ class TransferWorker(QRunnable):
 
     def _run_file(self) -> None:
         item = self.item
+        session = self.manager.session
+        # Binary is the default; only an extension on the ASCII whitelist is
+        # sent as text, because ASCII mode re-encodes line endings and must not
+        # touch anything binary.
+        session._set_transfer_type(self.manager.mode_for(item))
         if item.kind == "upload":
             if not os.path.isfile(item.source):
                 raise _session.SessionError("Local file disappeared: %s" % item.source)
-            self.manager.session.upload_file(
+            session.upload_file(
                 item.source, item.target, self._progress, self.control)
         else:
             _session.ensure_local_dir(os.path.dirname(item.target))
-            self.manager.session.download_file(
+            session.download_file(
                 item.source, item.target, self._progress, self.control)
 
 
@@ -138,7 +152,8 @@ class TransferManager(QObject):
         self._paused = False
         self._stopped = False
         self._pool = QThreadPool(self)
-        self._pool.setMaxThreadCount(4)
+        # the pool must be able to run everything the preference can ask for
+        self._pool.setMaxThreadCount(MAX_CONCURRENCY)
         self._timer = QTimer(self)
         self._timer.setInterval(120)
         self._timer.timeout.connect(self._pump)
@@ -149,16 +164,45 @@ class TransferManager(QObject):
     # -- queue management ----------------------------------------------
     def concurrency(self) -> int:
         try:
-            value = int(self.settings.get("transfers", "concurrency", 2) or 2)
+            value = int(self.settings.get("transfers", "concurrency", 5) or 5)
         except (TypeError, ValueError):
-            value = 2
-        return max(1, min(4, value))
+            value = 5
+        return max(1, min(MAX_CONCURRENCY, value))
 
     def retries(self) -> int:
         try:
-            return max(0, int(self.settings.get("transfers", "retries", 2) or 0))
+            return max(0, int(self.settings.get("transfers", "retries", 5) or 0))
         except (TypeError, ValueError):
             return 0
+
+    def ascii_extensions(self) -> "set":
+        """The extensions that may cross in ASCII mode, lower case, dotted."""
+        raw = str(self.settings.get("transfers", "ascii_extensions", "") or "")
+        out = set()
+        for token in raw.replace(",", " ").split():
+            token = token.strip().lower()
+            if not token:
+                continue
+            if not token.startswith("."):
+                token = "." + token
+            out.add(token)
+        return out
+
+    def mode_for(self, item: Any) -> str:
+        """``"ascii"`` for a whitelisted text extension, else ``"binary"``.
+
+        Binary is the default on purpose: it is byte exact.  ASCII is only ever
+        used for a file whose extension is on the list, because it re-encodes
+        line endings.
+        """
+        if getattr(item, "is_dir", False):
+            return "binary"
+        name = str(getattr(item, "source", "") or getattr(item, "target", ""))
+        lowered = name.lower()
+        for extension in self.ascii_extensions():
+            if lowered.endswith(extension):
+                return "ascii"
+        return "binary"
 
     def enqueue(self, items: List[TransferItem]) -> int:
         if not items:
@@ -302,6 +346,12 @@ class TransferManager(QObject):
         if self._stopped or self._paused:
             return
         limit = self.concurrency()
+        # FTP cannot run two transfers at once on one control connection: they
+        # race for the single data socket and the file arrives truncated with no
+        # error.  The preference still applies to SFTP, which parallelises
+        # safely, so the limit is clamped here rather than ignored by the GUI.
+        if getattr(self.session, "serial_transfers", False):
+            limit = 1
         started: List[Tuple[TransferItem, _session.TransferControl]] = []
         with self._lock:
             while self._active < limit:
