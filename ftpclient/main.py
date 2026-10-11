@@ -20,6 +20,7 @@ from PyQt5.QtWidgets import (QAbstractItemView, QAction, QApplication,
 
 from . import __appname__, __author__, __version__
 from . import config as _config
+from . import logfile as _logfile
 from . import session as _session
 from .dialogs import ConnectDialog, PreferencesDialog, SiteManagerDialog
 from .i18n import T, i18n, localise_box
@@ -262,6 +263,8 @@ class MainWindow(QMainWindow):
         #: uids that settled in the current batch; they share one dialog
         self._finished_uids: List[int] = []
         self._flush_scheduled = False
+        #: the last log-file error already reported, so it is said once
+        self._log_file_error: Optional[str] = None
         #: "Yes to all" applies to the current batch only, then resets
         self._overwrite_all = False
         #: the remote directory listing, fetched once per upload batch; asking
@@ -674,7 +677,19 @@ class MainWindow(QMainWindow):
     # logging
     # ------------------------------------------------------------------
     def log(self, level: str, message: str) -> None:
+        """Show a line in the log pane and record it in today's log file.
+
+        Everything the pane shows is also written to ``logs/YYYYMMDD.log``
+        beside the executable, so a problem can be reported after the fact.
+        """
         self.log_view.append_line(level, message)
+        _logfile.write(level, message)
+        # the first line that fails to reach the file should say so once, in
+        # the pane, rather than failing silently forever
+        error = _logfile.instance().error
+        if error and error != self._log_file_error:
+            self._log_file_error = error
+            self.log_view.append_line("warn", error)
 
     # ------------------------------------------------------------------
     # connections
@@ -1901,6 +1916,15 @@ class MainWindow(QMainWindow):
             QMessageBox.information(self, "Documentation",
                                     T("Could not open %s") % folder)
 
+    def open_log_folder(self) -> None:
+        """Reveal the folder holding the daily log files."""
+        from .manual import open_with_system
+
+        folder = _logfile.instance().open_folder()
+        if not open_with_system(folder):
+            QMessageBox.information(self, "Logs",
+                                    T("Could not open %s") % folder)
+
     def show_about(self) -> None:
         from . import __appname_cn__
         name = self._product_title()
@@ -1960,6 +1984,7 @@ class MainWindow(QMainWindow):
             "manual": self.open_manual,
             "manual_pdf": self.open_manual_pdf,
             "manual_folder": self.open_docs_folder,
+            "log_folder": self.open_log_folder,
             "shortcuts": self.show_shortcuts,
             "about": self.show_about,
             "quit": self.close,

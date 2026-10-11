@@ -109,10 +109,13 @@ def _command_line_flags(argv: Optional[List[str]] = None) -> List[str]:
 
 
 def startup_log_path() -> str:
-    """Where ``--log`` writes: beside the exe, never inside the bundle."""
-    from .resources import is_frozen, resource_root
-    base = os.path.dirname(sys.executable) if is_frozen() else resource_root()
-    return os.path.join(base, "bluebird-startup.log")
+    """The file ``--log`` and ``--selftest`` report into.
+
+    This is the same daily file the log pane writes to, so there is one place to
+    look: ``logs/YYYYMMDD.log`` beside the exe, never inside the bundle.
+    """
+    from .logfile import log_path_for
+    return log_path_for()
 
 
 def run_selftest() -> int:
@@ -253,11 +256,12 @@ def run_selftest() -> int:
     text = "\n".join(lines)
 
     print(text)
-    try:
-        with open(startup_log_path(), "w", encoding="utf-8") as handle:
-            handle.write(text + "\n")
-    except OSError:
-        pass
+    from .logfile import write as log_write
+
+    level = "error" if failures else "success"
+    for line in lines:
+        if line.strip():
+            log_write(level, "selftest: %s" % line)
     app.quit()
     return 1 if failures else 0
 
@@ -309,15 +313,11 @@ def run(argv: Optional[List[str]] = None) -> int:
 
     window.show()
     if "--log" in flags:
-        try:
-            with open(startup_log_path(), "w", encoding="utf-8") as handle:
-                handle.write("started pid=%d\nresource=%s\n"
-                             % (os.getpid(),
-                                __import__("ftpclient.resources",
-                                           fromlist=["resource_root"]
-                                           ).resource_root()))
-        except OSError:
-            pass
+        from .logfile import write as log_write
+        from .resources import resource_root
+
+        log_write("info", "started pid=%d, resource=%s"
+                  % (os.getpid(), resource_root()))
     return app.exec_()
 
 

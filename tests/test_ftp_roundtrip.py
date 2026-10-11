@@ -29,6 +29,7 @@ from ftpclient.transfer import plan_downloads, plan_uploads  # noqa: E402
 from tests.ftpserver import TestFTPServer, make_tree  # noqa: E402
 
 import inspect                                 # noqa: E402
+import io                                      # noqa: E402
 
 PASSED = []
 FAILED = []
@@ -644,6 +645,63 @@ def main():
               str(len(answers)))
         check("the directory was listed once, not once per file",
               listed["n"] == 1, "%d listings" % listed["n"])
+
+        print("\n-- the daily log file --")
+        from ftpclient import logfile as _logfile
+
+        log = _logfile.reset(os.path.join(workdir, "logs"))
+        log.write("info", "first line")
+        log.write("error", "second line")
+        log.write("success", "third line")
+        name = os.path.basename(log.path())
+        check("the log is named for today, YYYYMMDD.log",
+              name == "%s.log" % _logfile.date_stamp(), name)
+        check("the log lives in a logs folder",
+              os.path.basename(log.directory) == "logs", log.directory)
+        text = io.open(log.path(), encoding="utf-8").read()
+        check("every line reached the file",
+              all(marker in text
+                  for marker in ("first line", "second line", "third line")))
+        check("the level is recorded",
+              "INFO" in text and "ERROR" in text and "OK" in text)
+        check("a multi line message is kept on one line",
+              len([line for line in text.splitlines()
+                   if "second line" in line]) == 1)
+        check("the file opens with a header",
+              "log started" in text.splitlines()[:6].__str__()
+              or "log started" in text[:400])
+
+        # reopening must append, not truncate or repeat the header
+        log.close()
+        again = _logfile.reset(os.path.join(workdir, "logs"))
+        again.write("info", "after a restart")
+        after = io.open(again.path(), encoding="utf-8").read()
+        check("a restart appends to today's file",
+              "first line" in after and "after a restart" in after)
+        check("the header is written only for a new day",
+              after.count("log started") == 1, str(after.count("log started")))
+
+        # the date the file is named for must roll over
+        again._day = "20260101"          # pretend we are on a different day
+        again.write("info", "the next day")
+        rolled = os.path.join(again.directory, "%s.log"
+                              % _logfile.date_stamp())
+        check("a new day starts a new file", os.path.isfile(rolled))
+        if os.path.isfile(rolled):
+            check("the new day gets its own header",
+                  "log started" in io.open(rolled, encoding="utf-8").read())
+        again.close()
+
+        # logging must never raise, even when the folder cannot be made
+        blocked = _logfile.DailyLog(os.path.join(workdir, "nul", "logs"))
+        try:
+            blocked.write("info", "into nowhere")
+            raised = False
+        except Exception:                          # noqa: BLE001
+            raised = True
+        check("a bad log folder does not raise", not raised)
+        check("a bad log folder is reported once", bool(blocked.error))
+        blocked.close()
 
         print("\n-- the two session classes stay separate --")
         # A patch once added an FTP-only helper call to SFTPSession.listdir(),

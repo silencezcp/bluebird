@@ -283,7 +283,8 @@ D:\DSH_Workspaces\Ftp\python.exe -m PyInstaller --clean --noconfirm ^
 | 输出 | `dist\BlueBird\`（**on-dir 模式**，不是单文件） |
 | 为什么不用单文件 | 单文件每次启动都要把约 280 MB 解压到临时目录，很慢；on-dir 秒开 |
 | 手册位置 | `dist\BlueBird\docs\`（**和 exe 同级**，可直接替换成你自己的版本） |
-| 自检 | `BlueBird.exe --selftest` → 写 `bluebird-startup.log` |
+| 自检 | `BlueBird.exe --selftest` → 结果写进当天的 `logs\YYYYMMDD.log` |
+| 日志 | `dist\BlueBird\logs\20261011.log` —— 界面 Log 标签页的每一行都在里面，每天一个新文件 |
 | 版本号 | `BlueBird.exe --version` |
 | 体积构成 | `Qt5WebEngineCore.dll` 97 MB（内置手册渲染必须）、`opengl32sw.dll` 20 MB（无显卡驱动的机器需要）、Qt 其它库 |
 
@@ -485,6 +486,7 @@ Ftp Client/
 │  └─ BlueBird.spec           PyInstaller 配置（on-dir、剔除无用 Qt 模块）
 ├─ ftpclient/
 │  ├─ app.py                  引导、高 DPI、异常兜底、URL 参数、--selftest
+│  ├─ logfile.py              按天分文件的本地日志（logs\YYYYMMDD.log）
 │  ├─ main.py                 主窗口：连接栏、双栏、队列、日志、全部业务动作
 │  ├─ panes.py                FilePane：面板（导航 + 列表 + 状态 + 大小补齐）
 │  ├─ widgets.py              FileTableView（拖拽/列宽）、PathBar（含盘符）、LogView、PaneHeader、进度条代理

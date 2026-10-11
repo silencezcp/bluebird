@@ -167,6 +167,8 @@ class MainMenu(object):
         help_menu.addAction(self.act("manual_folder", "Open the &documentation "
                                                       "folder", "", "new_folder"))
         help_menu.addSeparator()
+        help_menu.addAction(self.act("log_folder", "Open the &log folder",
+                                     "", "log"))
         help_menu.addAction(self.act("shortcuts", "&Keyboard shortcuts",
                                      "Shift+F1", "log"))
         help_menu.addSeparator()
