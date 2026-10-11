@@ -124,15 +124,24 @@ def run_selftest() -> int:
     Packaged builds have no console, so this is how a frozen executable is
     verified: ``BlueBird.exe --selftest --log``.
     """
-    from .resources import is_frozen, resource_root
+    from .resources import (executable_dir, is_frozen, is_nuitka,
+                            is_pyinstaller, resource_root)
     from . import __appname__, __version__
 
     app = build_application([])
 
+    if is_nuitka():
+        builder = "Nuitka"
+    elif is_pyinstaller():
+        builder = "PyInstaller"
+    else:
+        builder = "source"
     report = [
         "%s %s" % (__appname__, __version__),
         "python      : %s" % sys.version.split()[0],
         "frozen      : %s" % is_frozen(),
+        "builder     : %s" % builder,
+        "program dir : %s" % executable_dir(),
         "resource    : %s" % resource_root(),
     ]
     failures = []

@@ -292,6 +292,70 @@ D:\DSH_Workspaces\Ftp\python.exe -m PyInstaller --clean --noconfirm ^
 QtWebEngine 可用、主窗口构建成功、**手册页面真实渲染完成**；GUI 启动常驻
 （约 102 MB 内存）。
 
+### 与 Nuitka 的对比（实验性，**当前不可交付**）
+
+除 PyInstaller 外，仓库里还有一份 Nuitka 打包链路：
+
+```bat
+build_exe_nuitka.cmd              :: → dist-nuitka\
+build_exe_nuitka.cmd --jobs 4     :: 控制并行 C 编译器数量
+build_exe_nuitka.cmd --dry-run    :: 只打印命令行
+```
+
+| 工具 | 文件 | 说明 |
+|---|---|---|
+| `tools/build_nuitka.py` | 构建驱动 | **从 `packaging/BlueBird.spec` 读取排除清单**，两个构建不会各自漂移 |
+| `tools/patch_nuitka.py` | 源码补丁 | 幂等；`--check` 只看不改，`--revert` 还原 |
+
+**实测结果（同一份源码）**
+
+| 指标 | PyInstaller | Nuitka |
+|---|---|---|
+| 构建耗时 | 约 40 s | 约 73 s（8 并行 cl.exe） |
+| 主 exe | 1.6 MB | **10.4 MB** |
+| 整包体积 | **254.3 MB** | 229.8 MB |
+| 文件数 | 1468 | **362** |
+| 启动 | 正常 | 正常（`--version` 通过） |
+| **QtWebEngine** | ✅ 可用 | ❌ **子进程崩溃** |
+| `--selftest` | ✅ `SELFTEST OK` | ❌ 崩溃 |
+
+> **结论：Nuitka 版当前不能交付。** 编译产物能启动、`--version` 正常，但
+> QtWebEngine 子进程在启动时失败：
+> `ERROR:icu_util.cc(251)] Couldn't mmap icu data file`，进程以
+> `0x80000003` 退出。**程序内「用户手册」依赖 QtWebEngine**，所以这条路径
+> 直接不可用。
+
+**已知的两个障碍**
+
+1. **MSVC 拒绝 Nuitka 4.3 的一行源码**（已由 `patch_nuitka.py` 处理）。
+   `MetaPathBasedLoaderResourceReader.c` 里有个 `static char const *x[];`
+   的暂定定义，MSVC 报 `error C2133: unknown size`——它在 C11 模式下也照样
+   报错，**GCC 则接受**，所以 MinGW 路径不需要补丁。补丁把该行删掉（真正的
+   定义来自随后 include 的文件，且数组在此之前未被使用）。**这是 Nuitka 的
+   缺陷，不是本项目的**。
+
+2. **QtWebEngine 找不到 ICU 数据**（未解决）。Nuitka 把 Qt 目录压平了：
+   PyInstaller 保留 `PyQt5\Qt5\bin\`，Nuitka 把 DLL 与
+   `QtWebEngineProcess.exe` 都放在根目录。已排除的可能：
+   - 六个候选位置都放了 `icudtl.dat`（含 `resources\`、`bin\resources\`、
+     `PyQt5\Qt5\resources\`）——仍然失败；
+   - `icudtl.dat` 与源文件 **SHA256 完全一致**（10,505,952 字节），文件没坏；
+   - `QTWEBENGINE_RESOURCES_PATH`、`QTWEBENGINE_CHROMIUM_FLAGS=--no-sandbox`
+     （以及 `--disable-gpu`、`--in-process-gpu`）均无效；
+   - 文件属性、工作目录、`qt.conf` 差异都已排除。
+
+   Qt 5.15 取的是 `QLibraryInfo::DataPath + "/resources"`，而它由 `qt.conf`
+   的 `Prefix` 决定（Nuitka 生成 `Prefix = .`）。PyInstaller 的 `qt.conf`
+   在 `PyQt5\Qt5\bin\` 下写 `Prefix = ..`。**具体成因尚未确定。**
+
+**上游说明**：Nuitka 官方文档明确写 PyQt5「支持相对有问题」，存在
+**回调与线程的已知缺陷**（[nuitka.net/pages/pyqt5.html](https://nuitka.net/pages/pyqt5.html)），
+并建议迁移到 PySide6。QtWebEngine 正是线程/回调密集型组件，这与上面的现象一致。
+
+**因此：正式交付仍用 PyInstaller（`build_exe.cmd`）。** Nuitka 这条链路保留
+下来用于继续排查，脚本本身是完整可用的——`--dry-run`、幂等补丁、排除清单同步
+都已验证。
+
 ### 两本手册：用户手册 与 开发手册
 
 | 手册 | 读者 | 内容 | 是否随 exe 打包 |
@@ -479,6 +543,7 @@ Ftp Client/
 ├─ run.py                     启动入口（源码运行）
 ├─ run.cmd / run_tests.cmd    免配置启动 / 测试
 ├─ build_exe.cmd              重建手册 → PyInstaller 打包 → 自检
+├─ build_exe_nuitka.cmd       同上，改用 Nuitka（实验性，见上文对比）
 ├─ requirements.txt           依赖清单（含每个库的授权协议）
 ├─ LICENSE                    GPL-3.0 全文（随 exe 分发）
 ├─ THIRD-PARTY-NOTICES.txt    各依赖协议全文（随 exe 分发）
