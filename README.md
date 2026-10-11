@@ -1,6 +1,6 @@
 # 青鸟 BlueBird — 现代奶白色 FTP / FTPS / SFTP 客户端
 
-**作者：silence** ｜ 版本 1.32.0
+**作者：silence** ｜ 版本 1.35.0
 
 基于 **Python 3.8.3 + PyQt5 5.15.11 + PyQtWebEngine 5.15.7 + paramiko** 实现的
 FTP/SFTP 双栏客户端，界面参考 **FileZilla Client** 的信息架构，但换成现代奶白色
@@ -147,7 +147,7 @@ D:\DSH_Workspaces\Ftp\python.exe -m pip install -r requirements.txt ^
 
 > **验证方式**：本清单已在**全新 venv** 中实测——25 个包版本与固定值完全一致，
 > 应用自检通过（Qt / web engine / PyNaCl / Ed25519 签名 / 手册渲染），
-> 两套测试 **69 + 320 全部通过**。这证明清单既**充分**（不缺包）又**最小**
+> 三套测试 **50 + 128 + 328 全部通过**。这证明清单既**充分**（不缺包）又**最小**
 > （无多余包）。
 >
 > `pyqt5-tools` 不需要：界面全部用纯 Python + QSS + 运行时生成的 SVG 图标写成，
@@ -504,8 +504,9 @@ Ftp Client/
 │  └─ config.py               设置（settings.json）与连接（config.ini）
 ├─ tests/
 │  ├─ ftpserver.py            内嵌 pyftpdlib FTP 服务器
+│  ├─ test_listing_parsers.py 目录列表格式解析（50 项）
 │  ├─ test_ftp_roundtrip.py   会话层端到端测试（128 项）
-│  ├─ test_ui_smoke.py        界面无头冒烟测试（320 项）
+│  ├─ test_ui_smoke.py        界面无头冒烟测试（328 项）
 ├─ tools/
 │  ├─ screenshot.py           生成文档截图
 │  ├─ build_manual.py         由 Markdown 生成两本手册的 HTML / PDF
@@ -559,19 +560,27 @@ run_tests.cmd
 或者单独跑：
 
 ```bat
+D:\DSH_Workspaces\Ftp\python.exe tests\test_listing_parsers.py :: 50 项
 D:\DSH_Workspaces\Ftp\python.exe tests\test_ftp_roundtrip.py   :: 128 项
-D:\DSH_Workspaces\Ftp\python.exe tests\test_ui_smoke.py        :: 320 项（无头）
+D:\DSH_Workspaces\Ftp\python.exe tests\test_ui_smoke.py        :: 328 项（无头）
 ```
 
 覆盖范围：
 
+* **目录列表格式 50 项**：三种格式都要认 —— MLSD 的 facts（`type=dir` 时
+  `sizd` 不能当文件大小）、Unix `ls -l`（含软链接 `->` 截断）、以及
+  **Microsoft FTP 服务的 DOS 风格**（`10-11-26  01:17PM  <DIR>  name`）。
+  DOS 样本是从真实 IIS 服务器逐字抄下来的，含 12 小时制换算
+  （`12:05AM` → 00:05、`12:05PM` → 12:05）、两位数年份换算、
+  以及**宽字节大小不被切错**（固定列位时代 10 位数字会读错名字）。
+  垃圾行（`total 12`、`226 Transfer complete`）必须被拒绝而不是猜。
 * **会话层 128 项**：连接、banner、MLSD 列目录、目录/文件识别、大小、导航、
   单文件上传下载、内容一致性、2 MiB 大文件往返、进度回调、递归上传计划、
   递归下载、文本读写、mkdir/rename/delete、递归删除、错误处理
   （路径不存在、端口拒绝且报错信息可读）、**7 条 FTP 错误路径必须抛
   `SessionError` 而不是 `TypeError`**、**`SIZE`/`MDTM` 单文件大小查询**、
   取消传输后自动重连。
-* **界面层 320 项**：
+* **界面层 328 项**：
   * **内置手册与帮助菜单**：资源定位（源码/打包两种模式）、手册 HTML/PDF/MD 均能找到、
     HTML 自包含且已记录新功能、Help 菜单四项齐全、F1 打开手册、Shift+F1 快捷键、
     词条齐备、无 web 引擎时有浏览器回退；

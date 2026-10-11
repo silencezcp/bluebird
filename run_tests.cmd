@@ -4,6 +4,9 @@ setlocal
 set "PY=D:\DSH_Workspaces\Ftp\python.exe"
 if not exist "%PY%" set "PY=python"
 cd /d "%~dp0"
+echo ==== directory listing formats ====
+"%PY%" tests\test_listing_parsers.py || goto :fail
+echo.
 echo ==== session / transfer round trip ====
 "%PY%" tests\test_ftp_roundtrip.py || goto :fail
 echo.

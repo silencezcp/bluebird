@@ -19,6 +19,7 @@ import ftplib
 import io
 import os
 import posixpath
+import re
 import select
 import socket
 import stat as stat_module
@@ -39,6 +40,15 @@ CHUNK = 64 * 1024
 #: can be extended - ``except FTP_ERRORS`` would raise
 #: ``TypeError: catching classes that do not inherit from BaseException``.
 FTP_ERRORS = tuple(ftplib.all_errors) + (OSError, EOFError)
+
+#: The DOS style directory line that Microsoft's FTP service returns:
+#: ``10-11-26  01:17PM              1661239 name`` or ``... <DIR>  name``.
+#: A pattern is used rather than fixed columns because the padding before the
+#: name changes with the width of the size field.
+_DOS_LIST_RE = re.compile(
+    r"^(\d{2})-(\d{2})-(\d{2})\s+(\d{1,2}):(\d{2})\s*([AaPp][Mm])"
+    r"\s+(<DIR>|\d+)\s+(.+?)\s*$",
+    re.IGNORECASE)
 
 
 #: RFC 3659 "perm" fact letters, in the order the RFC documents them.  They
@@ -899,15 +909,38 @@ class FTPSession(BaseSession):
                 permissions=perms, owner=owner, group=group,
                 link_target=link_target,
             )
-        # MS-DOS style: 04-27-00  09:09PM       <DIR>          name
-        if len(text) > 39 and text[2] == "-" and text[5] == "-":
-            size_text = text[18:30].strip()
-            name = text[39:].strip()
-            if not name:
+        # MS-DOS style, which is what Microsoft's FTP service returns:
+        #   10-11-26  01:17PM              1661239 7z2603-x64.exe
+        #   10-11-26  01:16PM       <DIR>          backup
+        # Parsed with a pattern rather than fixed column positions: the padding
+        # between the size field and the name varies with the width of the size
+        # itself, so slicing at a constant offset mis-reads wider files.  The
+        # timestamp is worth taking too, where the fixed slice threw it away.
+        dos = _DOS_LIST_RE.match(text)
+        if dos:
+            month, day, year = (int(dos.group(1)), int(dos.group(2)),
+                                int(dos.group(3)))
+            # a two digit year that is more than a little ahead belongs to the
+            # previous century
+            this_year = time.localtime().tm_year % 100
+            year += 1900 if year > this_year + 1 else 2000
+            hour = int(dos.group(4)) % 12
+            if dos.group(6).upper() == "PM":
+                hour += 12
+            size_field = dos.group(7)
+            name = dos.group(8).strip()
+            if not name or name in (".", ".."):
                 return None
-            is_dir = size_text.upper() == "<DIR>"
-            return Entry(name=name, size=0 if is_dir else parse_size(size_text),
-                         is_dir=is_dir, mtime=None)
+            is_dir = size_field.upper() == "<DIR>"
+            stamp = None
+            try:
+                stamp = time.mktime((year, month, day, hour,
+                                     int(dos.group(5)), 0, 0, 0, -1))
+            except (ValueError, OverflowError):
+                stamp = None
+            return Entry(name=name,
+                         size=0 if is_dir else parse_size(size_field),
+                         mtime=stamp, is_dir=is_dir)
         return None
 
     # -- mutation -------------------------------------------------------
