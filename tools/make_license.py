@@ -1,9 +1,11 @@
-"""Rebuild LICENSE the way GitHub's licence detector expects to read it.
+"""Write LICENSE as the pristine GNU GPL, and keep the notes out of it.
 
-The detector looks for a known licence at the top of the file, so a bespoke
-preamble made it report "Other".  The GNU GPL text therefore comes first, with
-the program name and copyright line the GPL itself says to add, and the notes
-this project wants to make follow it as an appendix.
+GitHub classifies the licence by matching the file against known texts.  An
+appendix of project notes is not part of the GPL, and it was enough to make the
+detector report "Other" even with the GPL at the top.  So LICENSE now holds
+only the two-line notice the GPL asks for followed by the licence itself, and
+the explanation lives at the top of THIRD-PARTY-NOTICES.txt, which is where a
+reader looks for the project's licensing position anyway.
 """
 from __future__ import annotations
 
@@ -15,6 +17,22 @@ import site
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 GPL_HEADING = "GNU GENERAL PUBLIC LICENSE"
 GPL_END = "END OF TERMS AND CONDITIONS"
+
+#: what the GPL says to attach to the program's own licence
+NOTICE = """\
+BlueBird - a modern cream-themed FTP / FTPS / SFTP client
+Copyright (C) 2026 silence
+
+This program is free software: you can redistribute it and/or modify it under
+the terms of the GNU General Public License as published by the Free Software
+Foundation, either version 3 of the License, or (at your option) any later
+version.
+
+This program is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+
+"""
 
 
 def gpl_text() -> str:
@@ -33,76 +51,13 @@ def gpl_text() -> str:
     raise SystemExit("could not find the GPL text in the Qt runtime wheel")
 
 
-#: the header the GPL asks a program to put on its own licence, written
-#: flush left because that is the shape licence detectors expect to see
-NOTICE = """\
-BlueBird - a modern cream-themed FTP / FTPS / SFTP client
-Copyright (C) 2026 silence
-
-This program is free software: you can redistribute it and/or modify it under
-the terms of the GNU General Public License as published by the Free Software
-Foundation, either version 3 of the License, or (at your option) any later
-version.
-
-This program is distributed in the hope that it will be useful, but WITHOUT ANY
-WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
-PARTICULAR PURPOSE.  See the GNU General Public License for more details.
-
-"""
-
-APPENDIX = """
-
-==============================================================================
-APPENDIX - why this project is licensed this way, and what it is built on
-==============================================================================
-
-The licence above applies to BlueBird.  The program name and copyright line
-have been added to it as the GNU GPL itself instructs ("How to Apply These
-Terms to Your New Programs").
-
-Why the GPL
------------
-
-BlueBird is built on PyQt5 and PyQtWebEngine.  Riverbank Computing licenses
-those under the GNU GPL version 3 or a commercial licence, at your choice.
-Distributing BlueBird under the GPL is what makes that use compliant.  A build
-that is distributed as closed source would instead need the commercial licence
-from Riverbank.
-
-The Qt libraries that ship alongside (PyQt5-Qt5, PyQtWebEngine-Qt5) are used
-under the LGPL option.  They are installed as separate DLLs next to the
-executable rather than linked into it, which is the arrangement the LGPL asks
-for, and their licence texts are in THIRD-PARTY-NOTICES.txt.
-
-Third-party components
-----------------------
-
-THIRD-PARTY-NOTICES.txt, beside this file, reproduces or points to the licence
-of every dependency, with the exact terms read from each package rather than
-copied from memory.  It must accompany any distribution of the binaries, as
-MIT, BSD, Apache-2.0, PSF and LGPL all require their licence text to travel
-with the program.
-
-Source
-------
-
-    https://github.com/silencezcp/bluebird
-
-This program comes with ABSOLUTELY NO WARRANTY, to the extent permitted by
-law.  It is free software, and you are welcome to redistribute it under the
-conditions of the GNU General Public License above.
-"""
-
-text = NOTICE + gpl_text() + APPENDIX
+text = NOTICE + gpl_text()
 target = os.path.join(ROOT, "LICENSE")
 io.open(target, "w", encoding="utf-8", newline="\n").write(text)
 
 print("wrote %s (%d bytes, %d lines)"
       % (target, os.path.getsize(target), text.count("\n")))
-first = [line for line in text.splitlines()[:4]]
-print("starts with:")
-for line in first:
-    print("   %s" % line)
-print("is ASCII          : %s" % text.isascii())
-print("has GPL-3.0 marker: %s" % ("Version 3, 29 June 2007" in text))
-print("has appendix      : %s" % ("APPENDIX" in text))
+print("  notice lines : %d" % NOTICE.count("\n"))
+print("  gpl lines    : %d" % gpl_text().count("\n"))
+print("  is ASCII     : %s" % text.isascii())
+print("  ends with    : %s" % text.rstrip().splitlines()[-1])

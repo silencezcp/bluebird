@@ -1,33 +1,43 @@
-THIRD-PARTY NOTICES
-===================
+THIRD-PARTY NOTICES AND LICENSING NOTES
+======================================
 
-BlueBird is distributed under the GNU General Public License version 3
-(see LICENSE).  It is built on the components listed below.  Their
-licences are reproduced here, or pointed to, because MIT, BSD,
-Apache-2.0, PSF and LGPL all require the licence text to accompany
-the binaries.
+BlueBird is distributed under the GNU General Public License version 3.
+The full text is in LICENSE beside this file.  The program name and
+copyright line sit at the top of it, as the GPL itself instructs.
 
-The texts were copied from the files installed alongside each
-component on the build machine, not retyped.  Regenerate this file
+This file carries the rest of the licensing picture: why the GPL applies
+here, and the licence of every component the program is built on.
+
+------------------------------------------------------------------------------
+WHY THE GPL APPLIES
+------------------------------------------------------------------------------
+
+* PyQt5 and PyQtWebEngine are GPL-3.0-only or commercial, from Riverbank
+  Computing, at your choice.  Distributing BlueBird under the GPL is what
+  makes that use compliant.  A build distributed as closed source would
+  instead need the commercial licence from Riverbank.
+* The Qt libraries those wheels carry (PyQt5-Qt5, PyQtWebEngine-Qt5) are
+  used under the LGPL option.  They are installed as separate DLLs beside
+  the executable rather than linked into it, which is the arrangement the
+  LGPL asks for.
+* PyMuPDF is AGPL-3.0, but only tools/build_manual.py uses it, to add the
+  manual's contents links and bookmarks.  It is a build tool and is not
+  part of the distributed executable.
+* PyInstaller is GPL-2.0-or-later with the Bootloader exception, which is
+  what allows a GPL build tool to package a program under other terms.
+
+******************************************************************************
+------------------------------------------------------------------------------
+THIRD-PARTY COMPONENTS
+------------------------------------------------------------------------------
+
+The texts below were copied from the files installed alongside each
+component on the build machine, not retyped.  MIT, BSD, Apache-2.0, PSF
+and LGPL all require their licence text to accompany the binaries, which
+is why this file must be distributed with BlueBird.exe.  Regenerate it
 with tools/make_notices.py after changing requirements.txt.
 
-Why BlueBird itself is under the GPL:
-
-  * PyQt5 and PyQtWebEngine are GPL-3.0-only or commercial, from
-    Riverbank Computing.  Distributing BlueBird under the GPL is what
-    makes that use compliant; a closed source build would need the
-    commercial licence.
-  * The Qt libraries those wheels carry (PyQt5-Qt5,
-    PyQtWebEngine-Qt5) are used under the LGPL option.  They ship as
-    separate DLLs beside the executable, which is what the LGPL asks
-    for.
-  * PyMuPDF is AGPL-3.0, but only tools/build_manual.py uses it, to
-    add the manual's contents links and bookmarks.  It is a build
-    tool and is not part of the distributed executable.
-  * PyInstaller is GPL-2.0-or-later with the Bootloader exception,
-    which is what lets a GPL build tool package a program under other
-    terms.
-
+******************************************************************************
 ==============================================================================
 COMPONENTS
 ==============================================================================
