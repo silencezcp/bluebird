@@ -33,10 +33,20 @@ def gpl_text() -> str:
     raise SystemExit("could not find the GPL text in the Qt runtime wheel")
 
 
-#: the two lines the GPL asks a program to put at the top of its licence
+#: the header the GPL asks a program to put on its own licence, written
+#: flush left because that is the shape licence detectors expect to see
 NOTICE = """\
-    BlueBird - a modern cream-themed FTP / FTPS / SFTP client
-    Copyright (C) 2026 silence
+BlueBird - a modern cream-themed FTP / FTPS / SFTP client
+Copyright (C) 2026 silence
+
+This program is free software: you can redistribute it and/or modify it under
+the terms of the GNU General Public License as published by the Free Software
+Foundation, either version 3 of the License, or (at your option) any later
+version.
+
+This program is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 
 """
 
