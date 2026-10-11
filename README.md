@@ -1,6 +1,6 @@
 # 青鸟 BlueBird — 现代奶白色 FTP / FTPS / SFTP 客户端
 
-**作者：silence** ｜ 版本 1.35.0
+**作者：silence** ｜ 版本 1.36.0
 
 基于 **Python 3.8.3 + PyQt5 5.15.11 + PyQtWebEngine 5.15.7 + paramiko** 实现的
 FTP/SFTP 双栏客户端，界面参考 **FileZilla Client** 的信息架构，但换成现代奶白色
@@ -256,7 +256,7 @@ D:\DSH_Workspaces\Ftp\python.exe -m pip install -r requirements.txt ^
 
 ## 2.5 打包成 exe
 
-`dist\BlueBird\` 是免安装版（**约 280 MB**，不需要装 Python），里面只有**一个程序**：
+`dist\BlueBird\` 是免安装版（**约 239 MB**，不需要装 Python），里面只有**一个程序**：
 
 | 文件 | 说明 |
 |---|---|
@@ -271,6 +271,20 @@ build_exe.cmd
 它会依次：重新生成图标（含手册里那份副本）→ 重建用户手册 →
 调用 PyInstaller → 跑一次 `--selftest` 自检。
 
+打包成压缩包分发：
+
+```bat
+pack_release.cmd         :: 只出 .7z
+pack_release.cmd zip     :: 同时出 .zip
+```
+
+| 格式 | 体积 | 说明 |
+|---|---|---|
+| `.7z`（LZMA2 ultra） | **约 69 MB** | 默认输出，比 zip 小 32% |
+| `.zip`（deflate max） | 约 101 MB | 加 `zip` 参数才生成；Windows 自带解压，无需装 7-Zip |
+
+输出在 `dist\release\`。
+
 单独打包：
 
 ```bat
@@ -281,12 +295,21 @@ D:\DSH_Workspaces\Ftp\python.exe -m PyInstaller --clean --noconfirm ^
 | 项目 | 说明 |
 |---|---|
 | 输出 | `dist\BlueBird\`（**on-dir 模式**，不是单文件） |
-| 为什么不用单文件 | 单文件每次启动都要把约 280 MB 解压到临时目录，很慢；on-dir 秒开 |
+| 为什么不用单文件 | 单文件每次启动都要把约 239 MB 解压到临时目录，很慢；on-dir 秒开 |
 | 手册位置 | `dist\BlueBird\docs\`（**和 exe 同级**，可直接替换成你自己的版本） |
 | 自检 | `BlueBird.exe --selftest` → 结果写进当天的 `logs\YYYYMMDD.log` |
 | 日志 | `dist\BlueBird\logs\20261011.log` —— 界面 Log 标签页的每一行都在里面，每天一个新文件 |
 | 版本号 | `BlueBird.exe --version` |
 | 体积构成 | `Qt5WebEngineCore.dll` 97 MB（内置手册渲染必须）、`opengl32sw.dll` 20 MB（无显卡驱动的机器需要）、Qt 其它库 |
+| 裁剪明细 | 构建时会打印每条规则删掉多少文件；设 `BLUEBIRD_TRIM_REPORT=0` 可关闭 |
+| 省掉软件 OpenGL | 设 `BLUEBIRD_DROP_OPENGL=1` 再构建，可再省 20 MB，但虚拟机／远程桌面下可能起不来 |
+
+**裁剪规则只删 Windows 文件，不删 Python 模块** —— 这是关键区别：把
+`PyQt5.QtXmlPatterns` 加进 `excludes` 只是不收集 Python 绑定，
+`PyQt5\Qt5\bin\Qt5XmlPatterns.dll` 仍会随 PyQt5 一起进来，必须在 spec 里按路径删。
+保留清单写在 `packaging/BlueBird.spec` 的注释里：QtWebEngine 全家（核心 DLL、
+`QtQuick`/`QtQml`、`qml\QtWebEngine`、`qml\QtWebChannel`）、`Qt5Svg`（状态图标用
+`QSvgRenderer` 画）、png/jpeg/gif/ico 图片插件。
 
 **已验证**：`--selftest` 在打包后报告 `frozen: True`、手册 HTML/PDF 均能找到、
 QtWebEngine 可用、主窗口构建成功、**手册页面真实渲染完成**；GUI 启动常驻

@@ -112,13 +112,26 @@ a = Analysis(
 )
 
 # ---------------------------------------------------------------------------
-# trim files the bundle does not need (~45 MB).  The app localises its own
-# strings, so Qt's translation catalogues are dead weight; the Qt3D / Sensors /
-# Location QML modules are never loaded by the manual viewer.  QtWebEngine
-# itself (97 MB) and the software OpenGL fallback are kept on purpose.
+# Trim what the bundle does not need.  This runs on *files*, not Python
+# modules, which is the distinction that matters: adding "PyQt5.QtXmlPatterns"
+# to excludes stops the Python binding being collected, but the Windows DLL
+# PyQt5\Qt5\bin\Qt5XmlPatterns.dll still arrives with the PyQt5 distribution
+# and has to be removed here by path.
+#
+# What is kept, and why:
+#   Qt5WebEngineCore.dll (97 MB) - the built-in manual viewer, the largest
+#       single file, kept deliberately;
+#   Qt5Quick / Qt5Qml / qml\QtQuick / qml\QtWebEngine / qml\QtWebChannel -
+#       QtWebEngine needs these, so they cannot go while the viewer stays;
+#   Qt5Svg - the status icons are drawn with QSvgRenderer;
+#   imageformats for png/jpeg/gif/ico/bmp - needed to read icons and to
+#       preview files;
+#   opengl32sw - see KEEP_SOFTWARE_OPENGL below.
 # ---------------------------------------------------------------------------
 TRIM_PREFIXES = (
+    # Qt's own translation catalogues; the app localises its own strings
     "PyQt5\\Qt5\\translations\\",
+    # QML modules nothing in this application loads
     "PyQt5\\Qt5\\qml\\Qt3D",
     "PyQt5\\Qt5\\qml\\QtSensors",
     "PyQt5\\Qt5\\qml\\QtLocation",
@@ -126,7 +139,58 @@ TRIM_PREFIXES = (
     "PyQt5\\Qt5\\qml\\QtCharts",
     "PyQt5\\Qt5\\qml\\QtDataVisualization",
     "PyQt5\\Qt5\\qml\\QtPurchasing",
+    "PyQt5\\Qt5\\qml\\QtQuick3D",          # 3.8 MB
+    "PyQt5\\Qt5\\qml\\QtTest",             # 0.16 MB, for QML tests
+    "PyQt5\\Qt5\\qml\\QtBluetooth",        # 0.10 MB
+    "PyQt5\\Qt5\\qml\\QtNfc",              # 0.06 MB
+    "PyQt5\\Qt5\\qml\\QtMultimedia",       # 0.36 MB
+    "PyQt5\\Qt5\\qml\\QtWebSockets",       # 0.05 MB
+    "PyQt5\\Qt5\\qml\\QtRemoteObjects",    # 0.05 MB
+    "PyQt5\\Qt5\\qml\\QtWebView",          # 0.04 MB
+    # plugins for features the client does not use
+    "PyQt5\\Qt5\\plugins\\sqldrivers",     # no database
+    "PyQt5\\Qt5\\plugins\\designer",       # not editing .ui files
+    "PyQt5\\Qt5\\plugins\\qmltooling",     # QML debugging aids
+    "PyQt5\\Qt5\\plugins\\bearer",         # no bearer management
+    "PyQt5\\Qt5\\plugins\\playlistformats",
+    "PyQt5\\Qt5\\plugins\\mediaservice",
+    "PyQt5\\Qt5\\plugins\\audio",
+    "PyQt5\\Qt5\\plugins\\geoservices",
+    "PyQt5\\Qt5\\plugins\\position",
+    "PyQt5\\Qt5\\plugins\\sensorgestures",
+    "PyQt5\\Qt5\\plugins\\sensors",
+    "PyQt5\\Qt5\\plugins\\webview",
+    # Windows DLLs that ship with PyQt5 but nothing here calls
+    "PyQt5\\Qt5\\bin\\Qt5XmlPatterns.dll",  # 2.5 MB, unused
+    "PyQt5\\Qt5\\bin\\Qt5Sql.dll",
+    "PyQt5\\Qt5\\bin\\Qt5Test.dll",
+    "PyQt5\\Qt5\\bin\\Qt5Designer.dll",
+    "PyQt5\\Qt5\\bin\\Qt5Bluetooth.dll",
+    "PyQt5\\Qt5\\bin\\Qt5Nfc.dll",
+    "PyQt5\\Qt5\\bin\\Qt5Positioning.dll",
+    "PyQt5\\Qt5\\bin\\Qt5Sensors.dll",
+    "PyQt5\\Qt5\\bin\\Qt5SerialPort.dll",
+    "PyQt5\\Qt5\\bin\\Qt5Multimedia.dll",
+    "PyQt5\\Qt5\\bin\\Qt5MultimediaWidgets.dll",
+    "PyQt5\\Qt5\\bin\\Qt5WebSockets.dll",
+    "PyQt5\\Qt5\\bin\\Qt5Location.dll",
+    # d3dcompiler is only reached by WebEngine's ANGLE path, and the client
+    # renders through QtWidgets rather than WebGL
+    "PyQt5\\Qt5\\bin\\d3dcompiler_47.dll",  # 4.0 MB
+    # image formats the client never reads
+    "PyQt5\\Qt5\\plugins\\imageformats\\qwbmp.dll",
+    "PyQt5\\Qt5\\plugins\\imageformats\\qtga.dll",
+    "PyQt5\\Qt5\\plugins\\imageformats\\qicns.dll",
 )
+
+#: The software OpenGL fallback (20 MB) is kept by default.  It is what makes
+#: the program start at all on a machine with no usable GPU driver - a virtual
+#: machine, or a remote desktop session - and that is exactly the machine a
+#: portable FTP client tends to be run on.  Set BLUEBIRD_DROP_OPENGL=1 to trade
+#: those 20 MB for a potential "failed to create OpenGL context" at startup.
+import os as _os
+if _os.environ.get("BLUEBIRD_DROP_OPENGL") == "1":
+    TRIM_PREFIXES += ("PyQt5\\Qt5\\bin\\opengl32sw.dll",)
 
 #: (path fragment, description) for log lines such as "lib not found: ..."
 TRIM_SUBSTRINGS = ("qtquickscene2dplugin", "qtquickscene3dplugin")
@@ -146,13 +210,41 @@ def _keep(entry):
     return True
 
 
-_before = len(a.binaries) + len(a.datas)
+# Say *what* is removed, grouped by the rule that matched.  A trim this broad is
+# only safe if it can be seen: 500 files disappearing behind a single number is
+# how a needed DLL gets removed without anyone noticing.
+def _matched_rule(name):
+    normalised = str(name).replace("/", "\\")
+    for prefix in TRIM_PREFIXES:
+        if normalised.startswith(prefix):
+            return prefix.rstrip("\\")
+    lowered = normalised.lower()
+    for fragment in TRIM_SUBSTRINGS:
+        if fragment in lowered:
+            return fragment
+    return None
+
+
+# snapshot before trimming, so the report can say what went
+_collected = list(a.binaries) + list(a.datas)
+_before = len(_collected)
 # In PyInstaller 5 these are plain lists; keep it that way for compatibility.
 a.binaries = [item for item in a.binaries if _keep(item)]
 a.datas = [item for item in a.datas if _keep(item)]
 _after = len(a.binaries) + len(a.datas)
 print("BlueBird build: trimmed %d of %d collected files"
       % (_before - _after, _before))
+
+if _os.environ.get("BLUEBIRD_TRIM_REPORT") != "0":
+    _removed = {}
+    for entry in _collected:
+        if _keep(entry):
+            continue
+        rule = _matched_rule(entry[0]) or "?"
+        _removed[rule] = _removed.get(rule, 0) + 1
+    for rule in sorted(_removed, key=lambda key: -_removed[key]):
+        print("BlueBird build:   removed %4d file(s)  %s"
+              % (_removed[rule], rule))
 
 pyz = PYZ(a.pure, a.zipped_data, cipher=None)
 
